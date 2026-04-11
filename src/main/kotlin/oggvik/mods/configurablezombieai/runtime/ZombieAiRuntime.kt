@@ -134,6 +134,10 @@ object ZombieAiRuntime {
             return null
         }
 
+        // Switching runs as a fresh weighted draw on the configured tick, but
+        // it is not a completely global re-acquisition. The zombie keeps the
+        // current target's family as the switching domain, so a zombie already
+        // chasing a villager will only compare villagers during this pass.
         // Switching is deliberately family-local. Once a zombie is already
         // chasing a player, villager, golem, or turtle, the switching pass only
         // evaluates alternatives in that same family.
@@ -148,6 +152,9 @@ object ZombieAiRuntime {
             candidatesById.putIfAbsent(currentCandidate.target.id, currentCandidate)
         }
 
+        // The current target is added back separately so "stay on the current
+        // target" is represented as one of the weighted outcomes instead of a
+        // hardcoded special case outside the lottery.
         val candidates = candidatesById.values.toList()
         if (candidates.isEmpty()) {
             return null
@@ -157,6 +164,10 @@ object ZombieAiRuntime {
         val farthestDistance = candidates.maxOf { it.distance }
         val currentDistance = currentCandidate?.distance ?: sqrt(zombie.distanceToSqr(currentTarget))
 
+        // Conceptually this asks:
+        // "Given the current target and all same-family alternatives, which one
+        // should win right now after combining absolute closeness, improvement
+        // over the current target, and current-target stickiness?"
         return weightedPick(candidates, zombie.random) { candidate ->
             switchWeight(
                 candidate = candidate,
@@ -232,6 +243,10 @@ object ZombieAiRuntime {
             return null
         }
 
+        // The current target is validated at follow-range distance instead of
+        // switch-search-radius distance so a zombie can keep chasing a target
+        // that is still broadly valid even after it moves outside the smaller
+        // retargeting search radius.
         return TargetCandidate(currentTarget, sqrt(zombie.distanceToSqr(currentTarget)))
     }
 
@@ -263,6 +278,16 @@ object ZombieAiRuntime {
             1.0
         }
 
+        // Multiplying these exponential terms means each slider contributes
+        // additively in log-space:
+        //
+        // log(weight) =
+        //   switchTargetBias * absoluteCloseness
+        // + switchCloserThanCurrentBias * relativeImprovement
+        // + switchCurrentTargetBias * isCurrentTarget
+        //
+        // So each parameter has a separable conceptual role even though their
+        // effects can sometimes point in the same direction.
         return distanceWeight * relativeWeight * sameTargetWeight
     }
 
@@ -276,6 +301,8 @@ object ZombieAiRuntime {
             return 1.0
         }
 
+        // 1.0 means "closest in this candidate set", 0.0 means "farthest in
+        // this candidate set". Everything else is normalized in between.
         val normalizedCloseness = 1.0 - ((distance - closestDistance) / (farthestDistance - closestDistance)).coerceIn(0.0, 1.0)
         return exp(clampBias(bias) * normalizedCloseness)
     }

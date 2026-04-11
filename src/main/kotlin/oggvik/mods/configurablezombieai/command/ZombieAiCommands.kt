@@ -32,18 +32,16 @@ object ZombieAiCommands {
         // Acquisition settings control how zombies choose an initial target when
         // a vanilla target goal first decides it wants to acquire something.
         val acquisition = Commands.literal("acquisition")
-            .then(Commands.literal("variability")
+            .then(Commands.literal("distance_variability_from_closest_target")
                 .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(0.0, 4096.0))
                     .executes { context ->
-                        val blocks = DoubleArgumentType.getDouble(context, "blocks")
+                        val blocks = DoubleArgumentType.getDouble   (context, "blocks")
                         updateSettings(context.source) { data ->
                             data.acquisitionDistanceVariability = blocks
                             "Initial target variability set to ${formatDecimal(blocks)} blocks."
                         }
                     }))
-            .then(Commands.literal("bias")
-                .then(buildAcquisitionClosestChanceArgument()))
-            .then(Commands.literal("chance")
+            .then(Commands.literal("chance_to_auto-select_closest_target")
                 .then(buildAcquisitionClosestChanceArgument()))
 
         // Switching settings are separate from acquisition settings because the
@@ -67,7 +65,7 @@ object ZombieAiCommands {
                             "Target switching interval set to $ticks ticks."
                         }
                     }))
-            .then(Commands.literal("radius")
+            .then(Commands.literal("search_radius")
                 .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(1.0, 4096.0))
                     .executes { context ->
                         val blocks = DoubleArgumentType.getDouble(context, "blocks")
@@ -76,33 +74,12 @@ object ZombieAiCommands {
                             "Target switching search radius set to ${formatDecimal(blocks)} blocks."
                         }
                     }))
-            .then(Commands.literal("target_bias")
-                .then(Commands.argument("value", DoubleArgumentType.doubleArg())
-                    .executes { context ->
-                        val value = DoubleArgumentType.getDouble(context, "value")
-                        updateSettings(context.source) { data ->
-                            data.switchTargetBias = value
-                            "Target switching closest-bias set to ${formatDecimal(value)}."
-                        }
-                    }))
-            .then(Commands.literal("current_bias")
-                .then(Commands.argument("value", DoubleArgumentType.doubleArg())
-                    .executes { context ->
-                        val value = DoubleArgumentType.getDouble(context, "value")
-                        updateSettings(context.source) { data ->
-                            data.switchCurrentTargetBias = value
-                            "Target switching current-target bias set to ${formatDecimal(value)}."
-                        }
-                    }))
-            .then(Commands.literal("closer_bias")
-                .then(Commands.argument("value", DoubleArgumentType.doubleArg())
-                    .executes { context ->
-                        val value = DoubleArgumentType.getDouble(context, "value")
-                        updateSettings(context.source) { data ->
-                            data.switchCloserThanCurrentBias = value
-                            "Target switching closer-than-current bias set to ${formatDecimal(value)}."
-                        }
-                    }))
+            .then(Commands.literal("proximity_bias")
+                .then(buildSwitchAbsoluteProximityBiasArgument()))
+            .then(Commands.literal("current_target_bias")
+                .then(buildSwitchCurrentTargetStickinessArgument()))
+            .then(Commands.literal("closer_than_current_target_bias")
+                .then(buildSwitchRelativeImprovementBiasArgument()))
 
         // Utility commands are kept under the same root so server operators only
         // need one namespace for both AI tuning and admin actions.
@@ -140,7 +117,7 @@ object ZombieAiCommands {
                     context.source.sendSuccess(buildStatusMessage(data), false)
                     1
                 })
-            .then(Commands.literal("los")
+            .then(Commands.literal("ignore_LOS")
                 .then(Commands.argument("enabled", BoolArgumentType.bool())
                     .executes { context ->
                         val enabled = BoolArgumentType.getBool(context, "enabled")
@@ -149,7 +126,7 @@ object ZombieAiCommands {
                             "Zombie line-of-sight override ${formatToggle(enabled)}."
                         }
                     }))
-            .then(Commands.literal("despawn")
+            .then(Commands.literal("despawn_prevention")
                 .then(Commands.argument("disabled", BoolArgumentType.bool())
                     .executes { context ->
                         val disabled = BoolArgumentType.getBool(context, "disabled")
@@ -158,7 +135,7 @@ object ZombieAiCommands {
                             "Zombie despawn prevention ${formatToggle(disabled)}."
                         }
                     }))
-            .then(Commands.literal("range")
+            .then(Commands.literal("visibility_range")
                 .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(1.0, 4096.0))
                     .executes { context ->
                         val blocks = DoubleArgumentType.getDouble(context, "blocks")
@@ -193,6 +170,36 @@ object ZombieAiCommands {
                 updateSettings(context.source) { data ->
                     data.acquisitionClosestChancePercent = percent
                     "Initial target closest-chance set to ${formatPercent(percent)}."
+                }
+            }
+
+    private fun buildSwitchAbsoluteProximityBiasArgument() =
+        Commands.argument("value", DoubleArgumentType.doubleArg())
+            .executes { context ->
+                val value = DoubleArgumentType.getDouble(context, "value")
+                updateSettings(context.source) { data ->
+                    data.switchTargetBias = value
+                    "Target switching absolute-proximity bias set to ${formatDecimal(value)}."
+                }
+            }
+
+    private fun buildSwitchCurrentTargetStickinessArgument() =
+        Commands.argument("value", DoubleArgumentType.doubleArg())
+            .executes { context ->
+                val value = DoubleArgumentType.getDouble(context, "value")
+                updateSettings(context.source) { data ->
+                    data.switchCurrentTargetBias = value
+                    "Target switching current-target stickiness set to ${formatDecimal(value)}."
+                }
+            }
+
+    private fun buildSwitchRelativeImprovementBiasArgument() =
+        Commands.argument("value", DoubleArgumentType.doubleArg())
+            .executes { context ->
+                val value = DoubleArgumentType.getDouble(context, "value")
+                updateSettings(context.source) { data ->
+                    data.switchCloserThanCurrentBias = value
+                    "Target switching relative-improvement bias set to ${formatDecimal(value)}."
                 }
             }
 
@@ -263,9 +270,11 @@ object ZombieAiCommands {
             .append(StringTextComponent("Acquisition\n").withStyle(TextFormatting.YELLOW, TextFormatting.BOLD))
             .append(label("Distance Variability"))
             .append(value("${formatDecimal(data.acquisitionDistanceVariability)} blocks"))
+            .append(" (from closest possible target)")
             .append(StringTextComponent("\n"))
             .append(label("Closest Chance"))
             .append(value(formatPercent(data.acquisitionClosestChancePercent)))
+            .append(" (i.e. the chance to GUARANTEE the closest possible target will be selected)")
             .append(StringTextComponent("\n"))
             .append(StringTextComponent("Switching\n").withStyle(TextFormatting.YELLOW, TextFormatting.BOLD))
             .append(label("Enabled"))
@@ -277,14 +286,17 @@ object ZombieAiCommands {
             .append(label("Search Radius"))
             .append(value("${formatDecimal(data.switchSearchRadius)} blocks"))
             .append(StringTextComponent("\n"))
-            .append(label("Closest Bias"))
+            .append(label("Absolute Proximity Bias"))
             .append(value(formatDecimal(data.switchTargetBias)))
+            .append(" (How much should the zombie prefer nearer or farther candidates in the whole switching pool?)")
             .append(StringTextComponent("\n"))
-            .append(label("Current Target Bias"))
+            .append(label("Current Target Stickiness"))
             .append(value(formatDecimal(data.switchCurrentTargetBias)))
+            .append(" (How strongly should the zombie stay committed to the current target?)")
             .append(StringTextComponent("\n"))
-            .append(label("Closer Than Current Bias"))
+            .append(label("Relative Improvement Bias"))
             .append(value(formatDecimal(data.switchCloserThanCurrentBias)))
+            .append(" (How much should the zombie reward candidates that are closer than the current target?)")
     }
 
     private fun label(text: String): IFormattableTextComponent {
