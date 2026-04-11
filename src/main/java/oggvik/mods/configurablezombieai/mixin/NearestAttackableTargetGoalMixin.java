@@ -29,6 +29,8 @@ public abstract class NearestAttackableTargetGoalMixin {
             return;
         }
 
+        // Vanilla still decides whether this target goal is allowed to run at
+        // all. Once it does, the runtime owns the actual choice of target.
         this.target = ZombieAiRuntime.selectInitialTarget(mob, this.targetType, this.targetConditions);
         ci.cancel();
     }

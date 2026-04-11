@@ -17,6 +17,8 @@ public abstract class EntitySensesMixin {
 
     @Inject(method = "canSee(Lnet/minecraft/entity/Entity;)Z", at = @At("HEAD"), cancellable = true)
     private void configurablezombieai$canSee(Entity entity, CallbackInfoReturnable<Boolean> cir) {
+        // Returning true here preserves vanilla AI flow while selectively
+        // bypassing LOS checks for zombie targets when the feature is enabled.
         if (ZombieAiRuntime.shouldBypassLineOfSight(this.mob, entity)) {
             cir.setReturnValue(true);
         }

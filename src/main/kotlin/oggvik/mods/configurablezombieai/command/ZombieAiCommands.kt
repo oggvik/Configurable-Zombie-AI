@@ -15,6 +15,13 @@ import net.minecraft.util.text.TextFormatting
 import oggvik.mods.configurablezombieai.config.ZombieAiSavedData
 import oggvik.mods.configurablezombieai.runtime.ZombieAiRuntime
 
+/**
+ * OP-only runtime control surface for the mod.
+ *
+ * Every command mutates the live server-side settings object, then asks the
+ * runtime layer to refresh already-loaded zombies so the change takes effect
+ * immediately.
+ */
 object ZombieAiCommands {
     fun register(dispatcher: CommandDispatcher<CommandSource>) {
         dispatcher.register(buildRoot("czai"))
@@ -22,6 +29,8 @@ object ZombieAiCommands {
     }
 
     private fun buildRoot(name: String): LiteralArgumentBuilder<CommandSource> {
+        // Acquisition settings control how zombies choose an initial target when
+        // a vanilla target goal first decides it wants to acquire something.
         val acquisition = Commands.literal("acquisition")
             .then(Commands.literal("variability")
                 .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(0.0, 4096.0))
@@ -37,6 +46,8 @@ object ZombieAiCommands {
             .then(Commands.literal("chance")
                 .then(buildAcquisitionClosestChanceArgument()))
 
+        // Switching settings are separate from acquisition settings because the
+        // zombie's "stay or swap" decision uses a different algorithm.
         val switching = Commands.literal("switching")
             .then(Commands.literal("enabled")
                 .then(Commands.argument("value", BoolArgumentType.bool())
@@ -93,6 +104,8 @@ object ZombieAiCommands {
                         }
                     }))
 
+        // Utility commands are kept under the same root so server operators only
+        // need one namespace for both AI tuning and admin actions.
         val kill = Commands.literal("kill")
             .then(Commands.literal("all")
                 .executes { context ->
@@ -165,6 +178,9 @@ object ZombieAiCommands {
     ): Int {
         val data = ZombieAiSavedData.get(source.level) ?: return 0
         val response = updater(data)
+        // Follow range is cached in entity attributes, so loaded zombies need an
+        // explicit refresh after settings change. Other features re-read settings
+        // live from mixin hooks and runtime helpers.
         ZombieAiRuntime.onSettingsChanged(source.server)
         source.sendSuccess(StringTextComponent(response).withStyle(TextFormatting.GREEN), true)
         return 1
@@ -183,6 +199,8 @@ object ZombieAiCommands {
     private fun killAllZombies(source: CommandSource): Int {
         var killed = 0
         for (world in source.server.allLevels) {
+            // "all" intentionally means every loaded dimension, not just the
+            // executor's current world.
             val zombies = world.allEntities.filterIsInstance<ZombieEntity>()
             for (zombie in zombies) {
                 zombie.kill()
@@ -205,6 +223,8 @@ object ZombieAiCommands {
             ZombieEntity::class.java,
             player.boundingBox.inflate(radius, radius, radius)
         ) { zombie ->
+            // The inflated box is only a coarse search shape; this keeps the
+            // final selection circular/spherical around the executing player.
             zombie.distanceToSqr(player) <= radiusSqr
         }
 
@@ -222,6 +242,8 @@ object ZombieAiCommands {
     }
 
     private fun buildStatusMessage(data: ZombieAiSavedData): IFormattableTextComponent {
+        // Status output is assembled manually so the command can present a
+        // compact operator dashboard instead of raw key/value spam.
         return StringTextComponent("")
             .append(StringTextComponent("========== ").withStyle(TextFormatting.DARK_GRAY))
             .append(StringTextComponent("Configurable Zombie AI").withStyle(TextFormatting.GOLD, TextFormatting.BOLD))

@@ -41,11 +41,14 @@ def java17Launcher = javaToolchains.launcherFor {
 }
 
 tasks.withType(JavaExec).configureEach {
+    // The game run tasks must match the JDK version Forge userdev expects.
     javaLauncher.set(java17Launcher)
 }
 
 tasks.register('copyMixinRefmap', Copy) {
     dependsOn tasks.named('compileJava')
+    // MixinGradle writes the generated refmap into compile output; copying it
+    // into processed resources keeps dev runs and built jars aligned.
     from(refmapOutput)
     into(layout.buildDirectory.dir('resources/main'))
 }
@@ -105,6 +108,8 @@ minecraft {
 }
 
 mixin {
+    // Kotlin owns most of the gameplay code, but the actual injections are Java
+    // mixins and still need a generated refmap.
     add sourceSets.main, "${archivesBaseName}.refmap.json"
     config "${archivesBaseName}.mixins.json"
 }

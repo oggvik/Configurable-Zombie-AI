@@ -11,6 +11,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 public abstract class ZombiePersistenceMixin {
     @Inject(method = "isPersistenceRequired()Z", at = @At("HEAD"), cancellable = true)
     private void configurablezombieai$isPersistenceRequired(CallbackInfoReturnable<Boolean> cir) {
+        // This hook is broad because persistence lives on MobEntity, but the
+        // runtime only opts zombies into forced persistence.
         if (ZombieAiRuntime.shouldPreventDespawn((MobEntity) (Object) this)) {
             cir.setReturnValue(true);
         }

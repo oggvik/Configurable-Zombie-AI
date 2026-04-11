@@ -18,6 +18,13 @@ import oggvik.mods.configurablezombieai.ConfigurableZombieAI
 import oggvik.mods.configurablezombieai.config.ZombieAiSavedData
 import java.util.function.Predicate
 
+/**
+ * Central gameplay logic for the mod.
+ *
+ * Mixins stay intentionally thin and delegate to this object so the rules for
+ * target acquisition, target switching, LOS bypass, despawn prevention, and
+ * follow-range updates live in one place.
+ */
 object ZombieAiRuntime {
     private const val ORIGINAL_FOLLOW_RANGE_KEY: String = "${ConfigurableZombieAI.ID}.original_follow_range"
     private const val BIAS_CLAMP: Double = 20.0
@@ -77,6 +84,9 @@ object ZombieAiRuntime {
             return null
         }
 
+        // Acquisition still respects vanilla goal families. This logic only
+        // replaces how one NearestAttackableTargetGoal picks within its own
+        // target class after the vanilla predicate has filtered candidates.
         val closestDistance = candidates.first().distance
         val maxDistance = closestDistance + settings.acquisitionDistanceVariability.coerceAtLeast(0.0)
         val pool = candidates.filter { it.distance <= maxDistance + EPSILON }
@@ -89,6 +99,9 @@ object ZombieAiRuntime {
             return null
         }
 
+        // The initial "closest chance" setting is intentionally simple:
+        // either roll among the closest-distance ties, or roll among the other
+        // valid candidates that survived the distance variability filter.
         val closestChance = settings.acquisitionClosestChancePercent.coerceIn(0.0, 100.0)
         if (closestChance <= EPSILON) {
             return pickRandom(pool, mob.random)?.target
@@ -121,6 +134,9 @@ object ZombieAiRuntime {
             return null
         }
 
+        // Switching is deliberately family-local. Once a zombie is already
+        // chasing a player, villager, golem, or turtle, the switching pass only
+        // evaluates alternatives in that same family.
         val targetFamily = resolveTargetFamily(currentTarget)
         val candidatesById = LinkedHashMap<Int, TargetCandidate>()
         for (candidate in collectSwitchCandidates(zombie, targetFamily, settings)) {
@@ -162,6 +178,8 @@ object ZombieAiRuntime {
         val followRange = zombie.getAttribute(Attributes.FOLLOW_RANGE) ?: return
         val persistentData = zombie.persistentData
         if (!persistentData.contains(ORIGINAL_FOLLOW_RANGE_KEY)) {
+            // The first time the mod touches a zombie, preserve vanilla's base
+            // follow range so disabling the mod can restore it cleanly.
             persistentData.putDouble(ORIGINAL_FOLLOW_RANGE_KEY, followRange.baseValue)
         }
 
@@ -178,6 +196,8 @@ object ZombieAiRuntime {
 
     @JvmStatic
     fun onSettingsChanged(server: MinecraftServer) {
+        // Only follow range needs an eager push. Other behaviors pick up the new
+        // values naturally because the runtime helpers re-read saved settings.
         for (world in server.allLevels) {
             for (entity in world.allEntities) {
                 if (entity is ZombieEntity) {
@@ -192,6 +212,8 @@ object ZombieAiRuntime {
         targetFamily: TargetFamily,
         settings: ZombieAiSavedData
     ): List<TargetCandidate> {
+        // Switching uses its own search radius instead of the full follow range
+        // so operators can make retargeting stricter or looser than acquisition.
         val predicate = buildEntityPredicate(settings.switchSearchRadius.coerceAtLeast(1.0), settings, targetFamily.selector)
         return collectCandidates(zombie, targetFamily.entityClass, settings.switchSearchRadius.coerceAtLeast(1.0)) { candidate ->
             predicate.test(zombie, candidate)
@@ -221,6 +243,10 @@ object ZombieAiRuntime {
         farthestDistance: Double,
         settings: ZombieAiSavedData
     ): Double {
+        // Switching has three independent influences:
+        // 1. absolute closeness within the candidate pool,
+        // 2. whether the candidate is closer than the current target, and
+        // 3. an explicit stay-on-current-target bias.
         val distanceWeight = closenessWeight(
             distance = candidate.distance,
             closestDistance = closestDistance,
@@ -263,6 +289,8 @@ object ZombieAiRuntime {
         settings: ZombieAiSavedData,
         selector: Predicate<LivingEntity>?
     ): EntityPredicate {
+        // Rebuilding predicates here keeps switching aligned with the current
+        // LOS mode and any family-specific selector, such as baby turtles on land.
         val predicate = EntityPredicate()
             .range(maxRange.coerceAtLeast(1.0))
             .selector(selector)
@@ -273,6 +301,7 @@ object ZombieAiRuntime {
     }
 
     private fun resolveTargetFamily(target: LivingEntity): TargetFamily {
+        // These families mirror the main zombie target-goal buckets in vanilla.
         return when (target) {
             is PlayerEntity -> TargetFamily(PlayerEntity::class.java)
             is AbstractVillagerEntity -> TargetFamily(AbstractVillagerEntity::class.java)
@@ -292,6 +321,8 @@ object ZombieAiRuntime {
         val searchBox = zombie.boundingBox.inflate(clampedRange, clampedRange, clampedRange)
         @Suppress("UNCHECKED_CAST")
         val typedClass = targetClass as Class<LivingEntity>
+        // The world query stays broad and then sorts by true Euclidean distance
+        // so both acquisition and switching can reason about nearest/farthest.
         return zombie.level.getEntitiesOfClass(typedClass, searchBox) { candidate ->
             predicate(candidate)
         }.map { candidate ->
@@ -304,6 +335,8 @@ object ZombieAiRuntime {
             return null
         }
 
+        // Invalid or non-positive weights are ignored so configuration edge
+        // cases degrade into a safe uniform pick instead of crashing.
         val weights = DoubleArray(values.size)
         var totalWeight = 0.0
 
@@ -338,11 +371,13 @@ object ZombieAiRuntime {
         return values[random.nextInt(values.size)]
     }
 
+    // A "family" is the switching scope for an already-acquired target.
     private data class TargetFamily(
         val entityClass: Class<out LivingEntity>,
         val selector: Predicate<LivingEntity>? = null
     )
 
+    // Carrying precomputed distances keeps the higher-level logic readable.
     private data class TargetCandidate(
         val target: LivingEntity,
         val distance: Double

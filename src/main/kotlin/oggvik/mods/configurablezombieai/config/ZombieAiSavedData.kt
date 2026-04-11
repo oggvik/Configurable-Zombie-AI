@@ -7,6 +7,12 @@ import net.minecraft.world.server.ServerWorld
 import net.minecraft.world.storage.WorldSavedData
 import oggvik.mods.configurablezombieai.ConfigurableZombieAI
 
+/**
+ * Server-owned settings for every feature in the mod.
+ *
+ * This is stored once in overworld data storage so all loaded dimensions share
+ * the same live configuration, and so command changes persist with the world.
+ */
 class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
     var modEnabled: Boolean = true
         set(value) {
@@ -140,6 +146,8 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
         private const val ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY: String = "acquisitionClosestChancePercent"
         const val VANILLA_FOLLOW_RANGE: Double = 35.0
 
+        // Commands and mixins ask for settings frequently, so the current
+        // server's data object is cached until the server shuts down.
         private var cachedServer: MinecraftServer? = null
         private var cachedData: ZombieAiSavedData? = null
 
@@ -160,6 +168,8 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
                 return cachedData
             }
 
+            // Overworld data storage is the shared persistent store for the
+            // whole server, even when commands are executed in another dimension.
             val data = server.overworld().dataStorage.computeIfAbsent(::ZombieAiSavedData, DATA_NAME)
             cachedServer = server
             cachedData = data
