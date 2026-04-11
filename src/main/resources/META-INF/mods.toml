@@ -9,7 +9,7 @@ license='GPL-3.0-or-later'
 modId="configurablezombieai"
 version="${file.jarVersion}"
 displayName="Configurable Zombie AI"
-credits="Special thanks to VarietyCube for pushing me to write everything by hand and avoid vibecoding."
+credits="Special thanks to my friends from the Dawn of Humanity: Attack on Titan-inspired roleplaying server community for giving me feedback when making this mod."
 authors="Oggvik"
 description='''
 A simple mod written in Kotlin that gives server admins several options to customize the vanilla zombie AI as well as some new AI features.
