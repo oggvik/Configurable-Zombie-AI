@@ -1,6 +1,6 @@
 package oggvik.mods.configurablezombieai.mixin;
 
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.monster.ZombieEntity;
 import oggvik.mods.configurablezombieai.runtime.ZombieAiRuntime;
 import org.spongepowered.asm.mixin.Mixin;
@@ -17,7 +17,7 @@ public abstract class ZombieTargetSwitchMixin {
             return;
         }
 
-        PlayerEntity selectedTarget = ZombieAiRuntime.selectSwitchTarget(zombie);
+        LivingEntity selectedTarget = ZombieAiRuntime.selectSwitchTarget(zombie);
         if (selectedTarget != null && selectedTarget != zombie.getTarget()) {
             zombie.setTarget(selectedTarget);
         }
