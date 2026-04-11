@@ -1,50 +1,40 @@
 package oggvik.mods.configurablezombieai
 
+import net.minecraft.entity.monster.ZombieEntity
+import net.minecraftforge.event.RegisterCommandsEvent
+import net.minecraftforge.event.entity.EntityJoinWorldEvent
 import net.minecraftforge.fml.common.Mod
-import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent
-import net.minecraftforge.fml.event.server.FMLServerAboutToStartEvent
-import org.apache.logging.log4j.Level
+import net.minecraftforge.fml.event.server.FMLServerStoppedEvent
+import oggvik.mods.configurablezombieai.command.ZombieAiCommands
+import oggvik.mods.configurablezombieai.config.ZombieAiSavedData
+import oggvik.mods.configurablezombieai.runtime.ZombieAiRuntime
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import thedarkcolour.kotlinforforge.forge.FORGE_BUS
-import thedarkcolour.kotlinforforge.forge.MOD_BUS
 
-/**
- * Main mod class. Should be an `object` declaration annotated with `@Mod`.
- * The modid should be declared in this object and should match the modId entry
- * in mods.toml.
- *
- * An example for blocks is in the `blocks` package of this mod.
- */
 @Mod(ConfigurableZombieAI.ID)
 object ConfigurableZombieAI {
-    // the modid of our mod
     const val ID: String = "configurablezombieai"
 
-    // the logger for our mod
     val LOGGER: Logger = LogManager.getLogger()
 
     init {
-        LOGGER.log(Level.INFO, "Hello world!")
-
-        // usage of the KotlinEventBus
-        MOD_BUS.addListener(::onClientSetup)
-        FORGE_BUS.addListener(::onServerAboutToStart)
+        FORGE_BUS.addListener(::onRegisterCommands)
+        FORGE_BUS.addListener(::onEntityJoinWorld)
+        FORGE_BUS.addListener(::onServerStopped)
     }
 
-    /**
-     * This is used for initializing client specific
-     * things such as renderers and keymaps
-     * Fired on the mod specific event bus.
-     */
-    private fun onClientSetup(event: FMLClientSetupEvent) {
-        LOGGER.log(Level.INFO, "Initializing client...")
+    private fun onRegisterCommands(event: RegisterCommandsEvent) {
+        ZombieAiCommands.register(event.dispatcher)
     }
 
-    /**
-     * Fired on the global Forge bus.
-     */
-    private fun onServerAboutToStart(event: FMLServerAboutToStartEvent) {
-        LOGGER.log(Level.INFO, "Server starting...")
+    private fun onEntityJoinWorld(event: EntityJoinWorldEvent) {
+        if (!event.world.isClientSide && event.entity is ZombieEntity) {
+            ZombieAiRuntime.applyCurrentSettings(event.entity as ZombieEntity)
+        }
+    }
+
+    private fun onServerStopped(@Suppress("UNUSED_PARAMETER") event: FMLServerStoppedEvent) {
+        ZombieAiSavedData.clearCache()
     }
 }

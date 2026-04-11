@@ -1,10 +1,12 @@
 buildscript {
     repositories {
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
         maven { url = 'https://maven.minecraftforge.net' }
         mavenCentral()
     }
     dependencies {
         classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: '5.+', changing: true
+        classpath 'org.spongepowered:mixingradle:0.7-SNAPSHOT'
         // Make sure this version matches the one included in Kotlin for Forge
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.5.21"
         // OPTIONAL Gradle plugin for Kotlin Serialization
@@ -12,6 +14,7 @@ buildscript {
     }
 }
 apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'org.spongepowered.mixin'
 apply plugin: 'kotlin'
 apply plugin: 'kotlinx-serialization'
 
@@ -31,12 +34,24 @@ tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
     kotlinOptions.jvmTarget = '1.8'
 }
 
+def refmapOutput = layout.buildDirectory.file("tmp/compileJava/${archivesBaseName}.refmap.json")
+
 def java17Launcher = javaToolchains.launcherFor {
     languageVersion = JavaLanguageVersion.of(17)
 }
 
 tasks.withType(JavaExec).configureEach {
     javaLauncher.set(java17Launcher)
+}
+
+tasks.register('copyMixinRefmap', Copy) {
+    dependsOn tasks.named('compileJava')
+    from(refmapOutput)
+    into(layout.buildDirectory.dir('resources/main'))
+}
+
+tasks.named('classes').configure {
+    dependsOn tasks.named('copyMixinRefmap')
 }
 
 minecraft {
@@ -53,7 +68,7 @@ minecraft {
             jvmArgs '--add-exports=java.base/sun.security.util=ALL-UNNAMED', '--add-opens=java.base/java.util.jar=ALL-UNNAMED'
 
             mods {
-                examplemod {
+                configurablezombieai {
                     source sourceSets.main
                 }
             }
@@ -66,7 +81,7 @@ minecraft {
             jvmArgs '--add-exports=java.base/sun.security.util=ALL-UNNAMED', '--add-opens=java.base/java.util.jar=ALL-UNNAMED'
 
             mods {
-                examplemod {
+                configurablezombieai {
                     source sourceSets.main
                 }
             }
@@ -81,7 +96,7 @@ minecraft {
             args '--mod', 'configurablezombieai', '--all', '--output', file('src/generated/resources/'), '--existing', file('src/main/resources')
 
             mods {
-                examplemod {
+                configurablezombieai {
                     source sourceSets.main
                 }
             }
@@ -89,10 +104,19 @@ minecraft {
     }
 }
 
+mixin {
+    add sourceSets.main, "${archivesBaseName}.refmap.json"
+    config "${archivesBaseName}.mixins.json"
+}
+
 // Include assets and data from data generators
 sourceSets.main.resources { srcDirs 'src/generated/resources/' }
 
 repositories {
+    maven {
+        name = 'Sponge'
+        url = 'https://repo.spongepowered.org/repository/maven-public/'
+    }
     maven {
         name = 'Kotlin for Forge'
         url = 'https://thedarkcolour.github.io/KotlinForForge/'
@@ -105,17 +129,20 @@ dependencies {
 
     // Use the latest version of KotlinForForge
     implementation 'thedarkcolour:kotlinforforge:1.14.0'
+    compileOnly 'org.spongepowered:mixin:0.8.5'
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 }
 
 jar {
     manifest {
         attributes([
-                "Specification-Title": "examplemod",
-                "Specification-Vendor": "examplemodsareus",
+                "Specification-Title": "configurablezombieai",
+                "Specification-Vendor": "Oggvik",
                 "Specification-Version": "1", // We are version 1 of ourselves
                 "Implementation-Title": project.name,
                 "Implementation-Version": "${version}",
-                "Implementation-Vendor" :"examplemodsareus",
+                "Implementation-Vendor" :"Oggvik",
+                "MixinConfigs": "${archivesBaseName}.mixins.json",
                 "Implementation-Timestamp": new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
         ])
     }
