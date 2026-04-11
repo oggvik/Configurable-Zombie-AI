@@ -8,6 +8,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import java.util.Locale
 import net.minecraft.command.CommandSource
 import net.minecraft.command.Commands
+import net.minecraft.entity.monster.ZombieEntity
 import net.minecraft.util.text.IFormattableTextComponent
 import net.minecraft.util.text.StringTextComponent
 import net.minecraft.util.text.TextFormatting
@@ -92,6 +93,18 @@ object ZombieAiCommands {
                         }
                     }))
 
+        val kill = Commands.literal("kill")
+            .then(Commands.literal("all")
+                .executes { context ->
+                    killAllZombies(context.source)
+                })
+            .then(Commands.literal("radius")
+                .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(0.0, 4096.0))
+                    .executes { context ->
+                        val blocks = DoubleArgumentType.getDouble(context, "blocks")
+                        killZombiesInRadius(context.source, blocks)
+                    }))
+
         return Commands.literal(name)
             .requires { source -> source.hasPermission(2) }
             .then(Commands.literal("enable")
@@ -141,6 +154,7 @@ object ZombieAiCommands {
                             "Zombie view distance set to ${formatDecimal(blocks)} blocks."
                         }
                     }))
+            .then(kill)
             .then(acquisition)
             .then(switching)
     }
@@ -165,6 +179,47 @@ object ZombieAiCommands {
                     "Initial target closest-chance set to ${formatPercent(percent)}."
                 }
             }
+
+    private fun killAllZombies(source: CommandSource): Int {
+        var killed = 0
+        for (world in source.server.allLevels) {
+            val zombies = world.allEntities.filterIsInstance<ZombieEntity>()
+            for (zombie in zombies) {
+                zombie.kill()
+            }
+            killed += zombies.size
+        }
+
+        source.sendSuccess(
+            StringTextComponent("Killed $killed zombie${pluralize(killed)} across all loaded worlds.")
+                .withStyle(TextFormatting.RED),
+            true
+        )
+        return killed
+    }
+
+    private fun killZombiesInRadius(source: CommandSource, radius: Double): Int {
+        val player = source.getPlayerOrException()
+        val radiusSqr = radius * radius
+        val zombies = player.level.getEntitiesOfClass(
+            ZombieEntity::class.java,
+            player.boundingBox.inflate(radius, radius, radius)
+        ) { zombie ->
+            zombie.distanceToSqr(player) <= radiusSqr
+        }
+
+        for (zombie in zombies) {
+            zombie.kill()
+        }
+
+        source.sendSuccess(
+            StringTextComponent(
+                "Killed ${zombies.size} zombie${pluralize(zombies.size)} within ${formatDecimal(radius)} blocks of ${player.name.string}."
+            ).withStyle(TextFormatting.RED),
+            true
+        )
+        return zombies.size
+    }
 
     private fun buildStatusMessage(data: ZombieAiSavedData): IFormattableTextComponent {
         return StringTextComponent("")
@@ -233,5 +288,9 @@ object ZombieAiCommands {
 
     private fun formatPercent(value: Double): String {
         return "${formatDecimal(value)}%"
+    }
+
+    private fun pluralize(count: Int): String {
+        return if (count == 1) "" else "s"
     }
 }
