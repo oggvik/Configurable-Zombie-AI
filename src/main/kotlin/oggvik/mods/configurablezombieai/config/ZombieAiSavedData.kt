@@ -38,9 +38,9 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
             setDirty()
         }
 
-    var acquisitionClosestBias: Double = 0.0
+    var acquisitionClosestChancePercent: Double = 100.0
         set(value) {
-            field = value
+            field = value.coerceIn(0.0, 100.0)
             setDirty()
         }
 
@@ -96,8 +96,8 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
         if (nbt.contains("acquisitionDistanceVariability")) {
             acquisitionDistanceVariability = nbt.getDouble("acquisitionDistanceVariability")
         }
-        if (nbt.contains("acquisitionClosestBias")) {
-            acquisitionClosestBias = nbt.getDouble("acquisitionClosestBias")
+        if (nbt.contains(ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY)) {
+            acquisitionClosestChancePercent = nbt.getDouble(ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY)
         }
         if (nbt.contains("switchEnabled")) {
             switchEnabled = nbt.getBoolean("switchEnabled")
@@ -125,7 +125,7 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
         compound.putBoolean("disableZombieDespawn", disableZombieDespawn)
         compound.putDouble("viewDistance", viewDistance)
         compound.putDouble("acquisitionDistanceVariability", acquisitionDistanceVariability)
-        compound.putDouble("acquisitionClosestBias", acquisitionClosestBias)
+        compound.putDouble(ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY, acquisitionClosestChancePercent)
         compound.putBoolean("switchEnabled", switchEnabled)
         compound.putInt("switchIntervalTicks", switchIntervalTicks)
         compound.putDouble("switchSearchRadius", switchSearchRadius)
@@ -137,6 +137,7 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
 
     companion object {
         private const val DATA_NAME: String = "${ConfigurableZombieAI.ID}_settings"
+        private const val ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY: String = "acquisitionClosestChancePercent"
         const val VANILLA_FOLLOW_RANGE: Double = 35.0
 
         private var cachedServer: MinecraftServer? = null

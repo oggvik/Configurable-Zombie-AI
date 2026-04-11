@@ -80,16 +80,28 @@ object ZombieAiRuntime {
         val closestDistance = candidates.first().distance
         val maxDistance = closestDistance + settings.acquisitionDistanceVariability.coerceAtLeast(0.0)
         val pool = candidates.filter { it.distance <= maxDistance + EPSILON }
-        val farthestDistance = pool.maxOf { it.distance }
+        if (pool.isEmpty()) {
+            return null
+        }
 
-        return weightedPick(pool, mob.random) { candidate ->
-            closenessWeight(
-                distance = candidate.distance,
-                closestDistance = closestDistance,
-                farthestDistance = farthestDistance,
-                bias = settings.acquisitionClosestBias
-            )
-        }?.target
+        val closestCandidates = pool.filter { kotlin.math.abs(it.distance - closestDistance) <= EPSILON }
+        if (closestCandidates.isEmpty()) {
+            return null
+        }
+
+        val closestChance = settings.acquisitionClosestChancePercent.coerceIn(0.0, 100.0)
+        if (closestChance <= EPSILON) {
+            return pickRandom(pool, mob.random)?.target
+        }
+
+        val otherCandidates = pool.filter { it.distance - closestDistance > EPSILON }
+        if (otherCandidates.isEmpty() || closestChance >= 100.0 - EPSILON) {
+            return pickRandom(closestCandidates, mob.random)?.target
+        }
+
+        val rolledClosest = mob.random.nextDouble() < (closestChance / 100.0)
+        val selectionPool = if (rolledClosest) closestCandidates else otherCandidates
+        return pickRandom(selectionPool, mob.random)?.target
     }
 
     @JvmStatic
@@ -316,6 +328,14 @@ object ZombieAiRuntime {
         }
 
         return values.last()
+    }
+
+    private fun <T> pickRandom(values: List<T>, random: java.util.Random): T? {
+        if (values.isEmpty()) {
+            return null
+        }
+
+        return values[random.nextInt(values.size)]
     }
 
     private data class TargetFamily(

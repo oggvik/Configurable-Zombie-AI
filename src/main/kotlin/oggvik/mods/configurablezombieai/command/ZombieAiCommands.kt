@@ -32,14 +32,9 @@ object ZombieAiCommands {
                         }
                     }))
             .then(Commands.literal("bias")
-                .then(Commands.argument("value", DoubleArgumentType.doubleArg())
-                    .executes { context ->
-                        val value = DoubleArgumentType.getDouble(context, "value")
-                        updateSettings(context.source) { data ->
-                            data.acquisitionClosestBias = value
-                            "Initial target closest-bias set to ${formatDecimal(value)}."
-                        }
-                    }))
+                .then(buildAcquisitionClosestChanceArgument()))
+            .then(Commands.literal("chance")
+                .then(buildAcquisitionClosestChanceArgument()))
 
         val switching = Commands.literal("switching")
             .then(Commands.literal("enabled")
@@ -161,6 +156,16 @@ object ZombieAiCommands {
         return 1
     }
 
+    private fun buildAcquisitionClosestChanceArgument() =
+        Commands.argument("percent", DoubleArgumentType.doubleArg(0.0, 100.0))
+            .executes { context ->
+                val percent = DoubleArgumentType.getDouble(context, "percent")
+                updateSettings(context.source) { data ->
+                    data.acquisitionClosestChancePercent = percent
+                    "Initial target closest-chance set to ${formatPercent(percent)}."
+                }
+            }
+
     private fun buildStatusMessage(data: ZombieAiSavedData): IFormattableTextComponent {
         return StringTextComponent("")
             .append(StringTextComponent("========== ").withStyle(TextFormatting.DARK_GRAY))
@@ -182,8 +187,8 @@ object ZombieAiCommands {
             .append(label("Distance Variability"))
             .append(value("${formatDecimal(data.acquisitionDistanceVariability)} blocks"))
             .append(StringTextComponent("\n"))
-            .append(label("Closest Bias"))
-            .append(value(formatDecimal(data.acquisitionClosestBias)))
+            .append(label("Closest Chance"))
+            .append(value(formatPercent(data.acquisitionClosestChancePercent)))
             .append(StringTextComponent("\n"))
             .append(StringTextComponent("Switching\n").withStyle(TextFormatting.YELLOW, TextFormatting.BOLD))
             .append(label("Enabled"))
@@ -224,5 +229,9 @@ object ZombieAiCommands {
 
     private fun formatDecimal(value: Double): String {
         return String.format(Locale.ROOT, "%.2f", value)
+    }
+
+    private fun formatPercent(value: Double): String {
+        return "${formatDecimal(value)}%"
     }
 }
