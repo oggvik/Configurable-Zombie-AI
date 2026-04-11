@@ -1,6 +1,5 @@
-package example.examplemod
+package oggvik.mods.configurablezombieai
 
-import example.examplemod.block.ModBlocks
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent
 import net.minecraftforge.fml.event.server.FMLServerAboutToStartEvent
@@ -17,19 +16,16 @@ import thedarkcolour.kotlinforforge.forge.MOD_BUS
  *
  * An example for blocks is in the `blocks` package of this mod.
  */
-@Mod(ExampleMod.ID)
-object ExampleMod {
+@Mod(ConfigurableZombieAI.ID)
+object ConfigurableZombieAI {
     // the modid of our mod
-    const val ID: String = "examplemod"
+    const val ID: String = "configurablezombieai"
 
     // the logger for our mod
     val LOGGER: Logger = LogManager.getLogger()
 
     init {
         LOGGER.log(Level.INFO, "Hello world!")
-
-        // Register the KDeferredRegister to the mod-specific event bus
-        ModBlocks.REGISTRY.register(MOD_BUS)
 
         // usage of the KotlinEventBus
         MOD_BUS.addListener(::onClientSetup)

@@ -3,24 +3,25 @@ modLoader="kotlinforforge"
 # Make sure this is set to the appropriate version range
 loaderVersion="[1.14,)" # Require at least 1.14.x
 # License is REQUIRED after 1.16
-license='LGPL'
+license='GPL-3.0-or-later'
 
 [[mods]]
-modId="examplemod"
+modId="configurablezombieai"
 version="${file.jarVersion}"
-displayName="ExampleMod"
-credits="The ExampleMod dev team"
-authors="ExampleModAuthor"
+displayName="Configurable Zombie AI"
+credits="Special thanks to VarietyCube for pushing me to write everything by hand and avoid vibecoding."
+authors="Oggvik"
 description='''
-Example mod that uses Kotlin for Forge.
+A simple mod written in Kotlin that gives server admins several options to customize the vanilla zombie AI as well as some new AI features.
+This mod is especially well suited for modpacks aiming to increase the difficulty of the vanilla game or servers.
 '''
-[[dependencies.examplemod]]
+[[dependencies.configurablezombieai]]
     modId="forge"
     mandatory=true
     versionRange="[36,)"
     ordering="NONE"
     side="BOTH"
-[[dependencies.examplemod]]
+[[dependencies.configurablezombieai]]
     modId="minecraft"
     mandatory=true
     versionRange="[1.16.5]"

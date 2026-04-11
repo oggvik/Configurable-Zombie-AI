@@ -1,2 +1,2 @@
-# Kotlin Modding Skeleton
-Provides an example mod written in Kotlin using Kotlin for Forge.
+# Configurable Zombie AI
+A simple Minecraft mod written in Kotlin without the use of any vibecoding.
