@@ -1,15 +1,21 @@
 package oggvik.mods.configurablezombieai
 
+import java.util.function.BiPredicate
+import java.util.function.Supplier
 import net.minecraft.entity.monster.ZombieEntity
 import net.minecraftforge.event.RegisterCommandsEvent
 import net.minecraftforge.event.entity.EntityJoinWorldEvent
+import net.minecraftforge.fml.ExtensionPoint
+import net.minecraftforge.fml.ModLoadingContext
 import net.minecraftforge.fml.common.Mod
 import net.minecraftforge.fml.event.server.FMLServerStoppedEvent
+import net.minecraftforge.fml.network.FMLNetworkConstants
 import oggvik.mods.configurablezombieai.command.ZombieAiCommands
 import oggvik.mods.configurablezombieai.config.ZombieAiSavedData
 import oggvik.mods.configurablezombieai.runtime.ZombieAiRuntime
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
+import org.apache.commons.lang3.tuple.Pair
 import thedarkcolour.kotlinforforge.forge.FORGE_BUS
 
 @Mod(ConfigurableZombieAI.ID)
@@ -26,6 +32,16 @@ object ConfigurableZombieAI {
     val LOGGER: Logger = LogManager.getLogger()
 
     init {
+        // This mod is server-authoritative. Registering the display test tells
+        // Forge that clients may connect even when they do not have the mod
+        // installed locally, as long as the server has it.
+        ModLoadingContext.get().registerExtensionPoint(ExtensionPoint.DISPLAYTEST) {
+            Pair.of(
+                Supplier { FMLNetworkConstants.IGNORESERVERONLY },
+                BiPredicate<String, Boolean> { _, _ -> true }
+            )
+        }
+
         // Commands, zombie setup, and cache cleanup are all server-side concerns.
         FORGE_BUS.addListener(::onRegisterCommands)
         FORGE_BUS.addListener(::onEntityJoinWorld)

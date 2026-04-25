@@ -21,6 +21,7 @@ The mod keeps vanilla target families intact. A zombie can still only target the
 - Forge: `36.x` or newer in the `1.16.5` line
 - Language/runtime: Kotlin via KotlinForForge
 - Implementation details: Sponge Mixin injections plus Kotlin runtime logic
+- Multiplayer clients do not need the mod installed to join a server running it.
 
 ## How Configuration Works
 
