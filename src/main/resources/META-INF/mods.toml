@@ -9,6 +9,7 @@ license='GPL-3.0-or-later'
 modId="configurablezombieai"
 version="${file.jarVersion}"
 displayName="Configurable Zombie AI"
+logoFile="czai_logo.png"
 credits="Special thanks to my friends from the Dawn of Humanity: Attack on Titan-inspired roleplaying server community for giving me feedback while making this mod."
 authors="Oggvik"
 description='''
