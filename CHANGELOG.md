@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2] - 2026-04-25
+
+### Fixed
+
+- Configured Forge's display test so clients without the mod installed can join servers that run the mod.
+
+
 ## [0.1.1] - 2026-04-25
 
 ### Added
@@ -17,7 +24,6 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 
 - Changed `/czai status` to send its output directly to the executing player so it remains visible even when the `sendCommandFeedback` gamerule is disabled.
-- Configured Forge's display test so clients without the mod installed can join servers that run the mod.
 
 ## [0.1.0] - 2026-04-12
 

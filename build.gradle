@@ -18,7 +18,7 @@ apply plugin: 'org.spongepowered.mixin'
 apply plugin: 'kotlin'
 apply plugin: 'kotlinx-serialization'
 
-version = '0.1.1'
+version = '0.1.2'
 group = 'oggvik.mods.configurablezombieai'
 archivesBaseName = 'configurablezombieai'
 
