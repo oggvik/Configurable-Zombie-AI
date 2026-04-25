@@ -2,18 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is inspired by Keep a Changelog. The `0.1.0` entry below is a baseline reconstructed from the repository history up to April 12, 2026.
-
 ## [0.1.1]
 
 ### Added
 
 - Added `CHANGELOG.md` to track future project history in one place.
-- Added logo.
+- Added a packaged mod logo asset so Forge can display the mod with branding in the mod list.
 
 ### Changed
 
 - Rewrote `README.md` with project overview, feature summary, command reference, defaults, build instructions, and licensing details.
+- Updated Forge mod metadata to reference the bundled logo file.
 
 ## [0.1.0] - 2026-04-12
 
