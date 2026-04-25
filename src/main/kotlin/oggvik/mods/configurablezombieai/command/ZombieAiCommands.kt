@@ -9,6 +9,8 @@ import java.util.Locale
 import net.minecraft.command.CommandSource
 import net.minecraft.command.Commands
 import net.minecraft.entity.monster.ZombieEntity
+import net.minecraft.entity.player.ServerPlayerEntity
+import net.minecraft.util.Util
 import net.minecraft.util.text.IFormattableTextComponent
 import net.minecraft.util.text.StringTextComponent
 import net.minecraft.util.text.TextFormatting
@@ -114,7 +116,7 @@ object ZombieAiCommands {
             .then(Commands.literal("status")
                 .executes { context ->
                     val data = ZombieAiSavedData.get(context.source.level) ?: return@executes 0
-                    context.source.sendSuccess(buildStatusMessage(data), false)
+                    sendStatusMessage(context.source, buildStatusMessage(data))
                     1
                 })
             .then(Commands.literal("ignore_LOS")
@@ -161,6 +163,18 @@ object ZombieAiCommands {
         ZombieAiRuntime.onSettingsChanged(source.server)
         source.sendSuccess(StringTextComponent(response).withStyle(TextFormatting.GREEN), true)
         return 1
+    }
+
+    private fun sendStatusMessage(source: CommandSource, message: IFormattableTextComponent) {
+        val player = source.entity as? ServerPlayerEntity
+        if (player != null) {
+            // Direct player chat bypasses the normal command-feedback gamerule,
+            // so status stays visible even when servers suppress command spam.
+            player.sendMessage(message, Util.NIL_UUID)
+            return
+        }
+
+        source.sendSuccess(message, false)
     }
 
     private fun buildAcquisitionClosestChanceArgument() =

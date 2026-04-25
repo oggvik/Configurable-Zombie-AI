@@ -14,6 +14,10 @@ All notable changes to this project will be documented in this file.
 - Rewrote `README.md` with project overview, feature summary, command reference, defaults, build instructions, and licensing details.
 - Updated Forge mod metadata to reference the bundled logo file.
 
+### Fixed
+
+- Changed `/czai status` to send its output directly to the executing player so it remains visible even when the `sendCommandFeedback` gamerule is disabled.
+
 ## [0.1.0] - 2026-04-12
 
 ### Added
