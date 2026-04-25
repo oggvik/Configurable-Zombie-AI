@@ -288,7 +288,7 @@ object ZombieAiCommands {
             .append(StringTextComponent("\n"))
             .append(label("Absolute Proximity Bias"))
             .append(value(formatDecimal(data.switchTargetBias)))
-            .append(" (How much should the zombie prefer nearer or farther candidates in the whole switching pool?)")
+            .append(" (How strongly should the zombie prefer nearer candidates in the whole switching pool?)")
             .append(StringTextComponent("\n"))
             .append(label("Current Target Stickiness"))
             .append(value(formatDecimal(data.switchCurrentTargetBias)))
@@ -296,7 +296,7 @@ object ZombieAiCommands {
             .append(StringTextComponent("\n"))
             .append(label("Relative Improvement Bias"))
             .append(value(formatDecimal(data.switchCloserThanCurrentBias)))
-            .append(" (How much should the zombie reward candidates that are closer than the current target?)")
+            .append(" (How strongly should the zombie reward candidates that are closer THAN the current target?)")
     }
 
     private fun label(text: String): IFormattableTextComponent {
