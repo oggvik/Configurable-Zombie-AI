@@ -18,7 +18,7 @@ apply plugin: 'org.spongepowered.mixin'
 apply plugin: 'kotlin'
 apply plugin: 'kotlinx-serialization'
 
-version = '0.1.2'
+version = '0.1.3'
 group = 'oggvik.mods.configurablezombieai'
 archivesBaseName = 'configurablezombieai'
 
@@ -34,7 +34,7 @@ tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
     kotlinOptions.jvmTarget = '1.8'
 }
 
-def refmapOutput = layout.buildDirectory.file("tmp/compileJava/${archivesBaseName}.refmap.json")
+def generatedMixinRefmap = layout.buildDirectory.file("tmp/compileJava/compileJava-refmap.json")
 
 def java17Launcher = javaToolchains.launcherFor {
     languageVersion = JavaLanguageVersion.of(17)
@@ -45,16 +45,15 @@ tasks.withType(JavaExec).configureEach {
     javaLauncher.set(java17Launcher)
 }
 
-tasks.register('copyMixinRefmap', Copy) {
+tasks.named('processResources').configure {
     dependsOn tasks.named('compileJava')
-    // MixinGradle writes the generated refmap into compile output; copying it
-    // into processed resources keeps dev runs and built jars aligned.
-    from(refmapOutput)
-    into(layout.buildDirectory.dir('resources/main'))
-}
-
-tasks.named('classes').configure {
-    dependsOn tasks.named('copyMixinRefmap')
+    exclude '.cache/**'
+    // MixinGradle writes the generated refmap into build/tmp/compileJava with a
+    // task-derived filename, so the jar task will miss it unless resources
+    // explicitly pick it up and rename it to match the mixin config.
+    from(generatedMixinRefmap) {
+        rename { "${archivesBaseName}.refmap.json" }
+    }
 }
 
 minecraft {
@@ -140,6 +139,7 @@ dependencies {
 
 jar {
     duplicatesStrategy = org.gradle.api.file.DuplicatesStrategy.EXCLUDE
+    archiveClassifier = 'dev'
     manifest {
         attributes([
                 "Specification-Title": "configurablezombieai",
@@ -154,7 +154,17 @@ jar {
     }
 }
 
-// Dev runs use deobfuscated names, but the distributable mod jar must be
-// reobfuscated so mixin shadows and bytecode references match normal Forge
-// runtime names outside the Gradle userdev environment.
+tasks.register('syncReleaseJar', Copy) {
+    dependsOn tasks.named('reobfJar')
+    from(layout.buildDirectory.file('reobfJar/output.jar'))
+    into(layout.buildDirectory.dir('libs'))
+    rename { "${archivesBaseName}-${version}.jar" }
+}
+
+// Dev runs use deobfuscated names, so keep that jar clearly marked. The
+// release artifact copied back into build/libs is the reobfuscated jar that
+// should be distributed to normal Forge launchers.
 jar.finalizedBy('reobfJar')
+tasks.named('assemble').configure {
+    dependsOn tasks.named('syncReleaseJar')
+}

@@ -113,7 +113,10 @@ Switching is off by default. When enabled, zombies periodically re-roll their ta
 ./gradlew runServer
 ```
 
-Build output is written to `build/libs/`. The project currently builds version `0.1.1`.
+Build output is written to `build/libs/`.
+
+- `configurablezombieai-<version>.jar`: reobfuscated release jar for normal Forge launchers
+- `configurablezombieai-<version>-dev.jar`: intermediate jar kept as the `reobfJar` input
 
 ## Project Layout
 

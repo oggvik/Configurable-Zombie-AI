@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.3] - 2026-04-26
+
+### Changed
+
+- Changed the Gradle packaging flow so `build/libs/configurablezombieai-<version>.jar` is the reobfuscated release artifact and the intermediate input jar is kept as `-dev`.
+
+### Fixed
+
+- Fixed packaged jars missing the generated mixin refmap, which made the mod work in Forge IDE runs but crash in normal launchers when `ZombiePersistenceMixin` loaded.
+
 ## [0.1.2] - 2026-04-25
 
 ### Fixed
