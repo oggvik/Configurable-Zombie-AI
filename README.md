@@ -65,6 +65,7 @@ Registered abnormal acquisition behaviors:
 | Behavior ID | Description |
 | --- | --- |
 | `furthest` | Selects the farthest valid target inside the zombie's configured acquisition range. |
+| `furthest_no_switching` | Selects the farthest valid target and prevents this zombie from target-switching while it keeps chasing that target. |
 
 ### Switching Tuning
 

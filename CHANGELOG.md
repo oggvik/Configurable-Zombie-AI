@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 
 - Added the groundwork for Abnormals, a weighted abnormal target-acquisition framework with a persisted global chance, per-behavior relative weights, OP commands, safe fallback to normal acquisition, and a registry for future behavior implementations.
 - Added the first abnormal target-acquisition behavior, `furthest`, which selects the farthest valid target inside the zombie's configured acquisition range.
+- Added `furthest_no_switching`, an abnormal target-acquisition behavior that selects the farthest valid target and prevents that zombie from target-switching while it keeps that target.
 
 ### Changed
 

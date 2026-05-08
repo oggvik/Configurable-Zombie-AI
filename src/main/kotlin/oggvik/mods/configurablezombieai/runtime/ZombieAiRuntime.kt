@@ -30,6 +30,10 @@ import java.util.function.Predicate
  */
 object ZombieAiRuntime {
     private const val ORIGINAL_FOLLOW_RANGE_KEY: String = "${ConfigurableZombieAI.ID}.original_follow_range"
+    private const val ABNORMAL_TARGET_SWITCH_LOCK_KEY: String =
+        "${ConfigurableZombieAI.ID}.abnormal_target_switch_lock"
+    private const val ABNORMAL_TARGET_SWITCH_LOCK_TARGET_UUID_KEY: String =
+        "${ConfigurableZombieAI.ID}.abnormal_target_switch_lock_target_uuid"
     private const val BIAS_CLAMP: Double = 20.0
     private const val EPSILON: Double = 1.0E-6
 
@@ -77,6 +81,8 @@ object ZombieAiRuntime {
         if (!settings.modEnabled) {
             return null
         }
+
+        clearAbnormalTargetSwitchLock(zombie)
 
         val followRange = mob.getAttributeValue(Attributes.FOLLOW_RANGE).coerceAtLeast(1.0)
         targetConditions.range(followRange)
@@ -148,6 +154,10 @@ object ZombieAiRuntime {
 
         val currentTarget = zombie.target ?: return null
         if (!currentTarget.isAlive) {
+            clearAbnormalTargetSwitchLock(zombie)
+            return null
+        }
+        if (isTargetSwitchingLockedByAbnormalAcquisition(zombie, currentTarget)) {
             return null
         }
 
@@ -203,6 +213,13 @@ object ZombieAiRuntime {
     }
 
     @JvmStatic
+    fun lockTargetSwitchingForAbnormalAcquisition(zombie: ZombieEntity, target: LivingEntity) {
+        val persistentData = zombie.persistentData
+        persistentData.putBoolean(ABNORMAL_TARGET_SWITCH_LOCK_KEY, true)
+        persistentData.putString(ABNORMAL_TARGET_SWITCH_LOCK_TARGET_UUID_KEY, target.uuid.toString())
+    }
+
+    @JvmStatic
     fun applyCurrentSettings(zombie: ZombieEntity) {
         if (zombie.level.isClientSide) {
             return
@@ -238,6 +255,34 @@ object ZombieAiRuntime {
                 }
             }
         }
+    }
+
+    private fun isTargetSwitchingLockedByAbnormalAcquisition(
+        zombie: ZombieEntity,
+        currentTarget: LivingEntity
+    ): Boolean {
+        val persistentData = zombie.persistentData
+        if (!persistentData.getBoolean(ABNORMAL_TARGET_SWITCH_LOCK_KEY)) {
+            return false
+        }
+
+        if (!persistentData.contains(ABNORMAL_TARGET_SWITCH_LOCK_TARGET_UUID_KEY)) {
+            clearAbnormalTargetSwitchLock(zombie)
+            return false
+        }
+
+        if (persistentData.getString(ABNORMAL_TARGET_SWITCH_LOCK_TARGET_UUID_KEY) == currentTarget.uuid.toString()) {
+            return true
+        }
+
+        clearAbnormalTargetSwitchLock(zombie)
+        return false
+    }
+
+    private fun clearAbnormalTargetSwitchLock(zombie: ZombieEntity) {
+        val persistentData = zombie.persistentData
+        persistentData.remove(ABNORMAL_TARGET_SWITCH_LOCK_KEY)
+        persistentData.remove(ABNORMAL_TARGET_SWITCH_LOCK_TARGET_UUID_KEY)
     }
 
     private fun collectSwitchCandidates(
