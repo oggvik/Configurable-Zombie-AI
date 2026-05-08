@@ -13,6 +13,8 @@ import net.minecraftforge.fml.network.FMLNetworkConstants
 import oggvik.mods.configurablezombieai.command.ZombieAiCommands
 import oggvik.mods.configurablezombieai.config.ZombieAiSavedData
 import oggvik.mods.configurablezombieai.runtime.ZombieAiRuntime
+import oggvik.mods.configurablezombieai.runtime.abnormals.targetacquisition.AbnormalTargetAcquisitionRegistry
+import oggvik.mods.configurablezombieai.runtime.abnormals.targetacquisition.behaviors.furthest.FurthestTargetAcquisitionBehavior
 import org.apache.logging.log4j.LogManager
 import org.apache.logging.log4j.Logger
 import org.apache.commons.lang3.tuple.Pair
@@ -41,6 +43,8 @@ object ConfigurableZombieAI {
                 BiPredicate<String, Boolean> { _, _ -> true }
             )
         }
+
+        AbnormalTargetAcquisitionRegistry.register(FurthestTargetAcquisitionBehavior)
 
         // Commands, zombie setup, and cache cleanup are all server-side concerns.
         FORGE_BUS.addListener(::onRegisterCommands)

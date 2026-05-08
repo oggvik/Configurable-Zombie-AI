@@ -59,6 +59,12 @@ These settings affect how a zombie picks an initial target after vanilla has alr
 | `czai acquisition abnormals behavior <behavior_id> chance <percent>` | Sets the relative chance for a specific abnormal behavior id. Behaviors with `0` chance are ignored. |
 | `czai acquisition abnormals list` | Lists registered abnormal acquisition behaviors. |
 
+Registered abnormal acquisition behaviors:
+
+| Behavior ID | Description |
+| --- | --- |
+| `furthest` | Selects the farthest valid target inside the zombie's configured acquisition range. |
+
 ### Switching Tuning
 
 Switching is off by default. When enabled, zombies periodically re-roll their target inside the same target family as the current one.
@@ -90,7 +96,7 @@ Switching is off by default. When enabled, zombies periodically re-roll their ta
 | Acquisition distance variability | `0.0` blocks |
 | Chance to auto-select closest target | `100.0%` |
 | Abnormal acquisition chance | `0.0%` |
-| Abnormal behavior chances | none |
+| Abnormal behavior chances | none configured |
 | Switching enabled | `false` |
 | Switching interval | `40` ticks |
 | Switching search radius | `16.0` blocks |
