@@ -16,6 +16,9 @@ import net.minecraft.entity.player.PlayerEntity
 import net.minecraft.server.MinecraftServer
 import oggvik.mods.configurablezombieai.ConfigurableZombieAI
 import oggvik.mods.configurablezombieai.config.ZombieAiSavedData
+import oggvik.mods.configurablezombieai.runtime.abnormals.targetacquisition.AbnormalTargetAcquisitionCandidate
+import oggvik.mods.configurablezombieai.runtime.abnormals.targetacquisition.AbnormalTargetAcquisitionContext
+import oggvik.mods.configurablezombieai.runtime.abnormals.targetacquisition.AbnormalTargetAcquisitionRegistry
 import java.util.function.Predicate
 
 /**
@@ -97,6 +100,25 @@ object ZombieAiRuntime {
         val closestCandidates = pool.filter { kotlin.math.abs(it.distance - closestDistance) <= EPSILON }
         if (closestCandidates.isEmpty()) {
             return null
+        }
+
+        val abnormalTarget = AbnormalTargetAcquisitionRegistry.trySelectTarget(
+            AbnormalTargetAcquisitionContext(
+                zombie = zombie,
+                targetType = targetType,
+                targetConditions = targetConditions,
+                candidates = candidates.map { it.toAbnormalTargetAcquisitionCandidate() },
+                acquisitionPool = pool.map { it.toAbnormalTargetAcquisitionCandidate() },
+                closestCandidates = closestCandidates.map { it.toAbnormalTargetAcquisitionCandidate() },
+                otherCandidates = pool.filter { it.distance - closestDistance > EPSILON }
+                    .map { it.toAbnormalTargetAcquisitionCandidate() },
+                closestDistance = closestDistance,
+                maxDistance = maxDistance
+            ),
+            settings
+        )
+        if (abnormalTarget != null) {
+            return abnormalTarget
         }
 
         // The initial "closest chance" setting is intentionally simple:
@@ -396,6 +418,10 @@ object ZombieAiRuntime {
         }
 
         return values[random.nextInt(values.size)]
+    }
+
+    private fun TargetCandidate.toAbnormalTargetAcquisitionCandidate(): AbnormalTargetAcquisitionCandidate {
+        return AbnormalTargetAcquisitionCandidate(target, distance)
     }
 
     // A "family" is the switching scope for an already-acquired target.

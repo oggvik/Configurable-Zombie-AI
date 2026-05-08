@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Added the groundwork for Abnormals, a weighted abnormal target-acquisition framework with persisted global and per-behavior chances, OP commands, safe fallback to normal acquisition, and a registry for future behavior implementations.
+
 ## [0.1.3] - 2026-04-26
 
 ### Changed

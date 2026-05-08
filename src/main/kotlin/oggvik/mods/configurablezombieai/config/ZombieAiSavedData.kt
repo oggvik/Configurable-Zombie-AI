@@ -6,6 +6,7 @@ import net.minecraft.world.World
 import net.minecraft.world.server.ServerWorld
 import net.minecraft.world.storage.WorldSavedData
 import oggvik.mods.configurablezombieai.ConfigurableZombieAI
+import java.util.Locale
 
 /**
  * Server-owned settings for every feature in the mod.
@@ -46,9 +47,17 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
 
     var acquisitionClosestChancePercent: Double = 100.0
         set(value) {
-            field = value.coerceIn(0.0, 100.0)
+            field = coercePercent(value)
             setDirty()
         }
+
+    var abnormalAcquisitionChancePercent: Double = 0.0
+        set(value) {
+            field = coercePercent(value)
+            setDirty()
+        }
+
+    private val abnormalAcquisitionBehaviorChancePercents: MutableMap<String, Double> = linkedMapOf()
 
     var switchEnabled: Boolean = false
         set(value) {
@@ -105,6 +114,16 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
         if (nbt.contains(ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY)) {
             acquisitionClosestChancePercent = nbt.getDouble(ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY)
         }
+        if (nbt.contains(ABNORMAL_ACQUISITION_CHANCE_PERCENT_KEY)) {
+            abnormalAcquisitionChancePercent = nbt.getDouble(ABNORMAL_ACQUISITION_CHANCE_PERCENT_KEY)
+        }
+        abnormalAcquisitionBehaviorChancePercents.clear()
+        if (nbt.contains(ABNORMAL_ACQUISITION_BEHAVIOR_CHANCES_KEY, NBT_COMPOUND_ID)) {
+            val behaviorChances = nbt.getCompound(ABNORMAL_ACQUISITION_BEHAVIOR_CHANCES_KEY)
+            for (behaviorId in behaviorChances.allKeys) {
+                setAbnormalAcquisitionBehaviorChancePercent(behaviorId, behaviorChances.getDouble(behaviorId))
+            }
+        }
         if (nbt.contains("switchEnabled")) {
             switchEnabled = nbt.getBoolean("switchEnabled")
         }
@@ -132,6 +151,12 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
         compound.putDouble("viewDistance", viewDistance)
         compound.putDouble("acquisitionDistanceVariability", acquisitionDistanceVariability)
         compound.putDouble(ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY, acquisitionClosestChancePercent)
+        compound.putDouble(ABNORMAL_ACQUISITION_CHANCE_PERCENT_KEY, abnormalAcquisitionChancePercent)
+        val behaviorChances = CompoundNBT()
+        for ((behaviorId, chancePercent) in abnormalAcquisitionBehaviorChancePercents) {
+            behaviorChances.putDouble(behaviorId, chancePercent)
+        }
+        compound.put(ABNORMAL_ACQUISITION_BEHAVIOR_CHANCES_KEY, behaviorChances)
         compound.putBoolean("switchEnabled", switchEnabled)
         compound.putInt("switchIntervalTicks", switchIntervalTicks)
         compound.putDouble("switchSearchRadius", switchSearchRadius)
@@ -141,10 +166,35 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
         return compound
     }
 
+    fun abnormalAcquisitionBehaviorChancePercents(): Map<String, Double> {
+        return abnormalAcquisitionBehaviorChancePercents.toMap()
+    }
+
+    fun getAbnormalAcquisitionBehaviorChancePercent(behaviorId: String): Double {
+        val normalizedId = normalizeAbnormalBehaviorId(behaviorId) ?: return 0.0
+        return abnormalAcquisitionBehaviorChancePercents[normalizedId] ?: 0.0
+    }
+
+    fun setAbnormalAcquisitionBehaviorChancePercent(behaviorId: String, percent: Double): Boolean {
+        val normalizedId = normalizeAbnormalBehaviorId(behaviorId) ?: return false
+        val clampedPercent = coercePercent(percent)
+        if (clampedPercent <= 0.0) {
+            abnormalAcquisitionBehaviorChancePercents.remove(normalizedId)
+        } else {
+            abnormalAcquisitionBehaviorChancePercents[normalizedId] = clampedPercent
+        }
+        setDirty()
+        return true
+    }
+
     companion object {
         private const val DATA_NAME: String = "${ConfigurableZombieAI.ID}_settings"
         private const val ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY: String = "acquisitionClosestChancePercent"
+        private const val ABNORMAL_ACQUISITION_CHANCE_PERCENT_KEY: String = "abnormalAcquisitionChancePercent"
+        private const val ABNORMAL_ACQUISITION_BEHAVIOR_CHANCES_KEY: String = "abnormalAcquisitionBehaviorChancePercents"
+        private const val NBT_COMPOUND_ID: Int = 10
         const val VANILLA_FOLLOW_RANGE: Double = 35.0
+        private val ABNORMAL_BEHAVIOR_ID_PATTERN = Regex("[a-z0-9_.:-]+")
 
         // Commands and mixins ask for settings frequently, so the current
         // server's data object is cached until the server shuts down.
@@ -174,6 +224,23 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
             cachedServer = server
             cachedData = data
             return data
+        }
+
+        private fun coercePercent(value: Double): Double {
+            if (!value.isFinite()) {
+                return 0.0
+            }
+
+            return value.coerceIn(0.0, 100.0)
+        }
+
+        fun normalizeAbnormalBehaviorId(behaviorId: String): String? {
+            val normalizedId = behaviorId.trim().lowercase(Locale.ROOT)
+            if (normalizedId.isEmpty() || !ABNORMAL_BEHAVIOR_ID_PATTERN.matches(normalizedId)) {
+                return null
+            }
+
+            return normalizedId
         }
     }
 }

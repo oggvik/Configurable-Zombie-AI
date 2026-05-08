@@ -4,6 +4,7 @@ import com.mojang.brigadier.CommandDispatcher
 import com.mojang.brigadier.arguments.BoolArgumentType
 import com.mojang.brigadier.arguments.DoubleArgumentType
 import com.mojang.brigadier.arguments.IntegerArgumentType
+import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import java.util.Locale
 import net.minecraft.command.CommandSource
@@ -15,6 +16,7 @@ import net.minecraft.util.text.IFormattableTextComponent
 import net.minecraft.util.text.StringTextComponent
 import net.minecraft.util.text.TextFormatting
 import oggvik.mods.configurablezombieai.config.ZombieAiSavedData
+import oggvik.mods.configurablezombieai.runtime.abnormals.targetacquisition.AbnormalTargetAcquisitionRegistry
 import oggvik.mods.configurablezombieai.runtime.ZombieAiRuntime
 
 /**
@@ -31,13 +33,40 @@ object ZombieAiCommands {
     }
 
     private fun buildRoot(name: String): LiteralArgumentBuilder<CommandSource> {
+        val abnormals = Commands.literal("abnormals")
+            .then(Commands.literal("chance")
+                .then(Commands.argument("percent", DoubleArgumentType.doubleArg(0.0, 100.0))
+                    .executes { context ->
+                        val percent = DoubleArgumentType.getDouble(context, "percent")
+                        updateSettings(context.source) { data ->
+                            data.abnormalAcquisitionChancePercent = percent
+                            "Abnormal acquisition chance set to ${formatPercent(percent)}."
+                        }
+                    }))
+            .then(Commands.literal("behavior")
+                .then(Commands.argument("behavior_id", StringArgumentType.word())
+                    .then(Commands.literal("chance")
+                        .then(Commands.argument("percent", DoubleArgumentType.doubleArg(0.0, 100.0))
+                            .executes { context ->
+                                setAbnormalAcquisitionBehaviorChance(
+                                    context.source,
+                                    StringArgumentType.getString(context, "behavior_id"),
+                                    DoubleArgumentType.getDouble(context, "percent")
+                                )
+                            }))))
+            .then(Commands.literal("list")
+                .executes { context ->
+                    sendAbnormalBehaviorList(context.source)
+                    1
+                })
+
         // Acquisition settings control how zombies choose an initial target when
         // a vanilla target goal first decides it wants to acquire something.
         val acquisition = Commands.literal("acquisition")
             .then(Commands.literal("distance_variability_from_closest_target")
                 .then(Commands.argument("blocks", DoubleArgumentType.doubleArg(0.0, 4096.0))
                     .executes { context ->
-                        val blocks = DoubleArgumentType.getDouble   (context, "blocks")
+                        val blocks = DoubleArgumentType.getDouble(context, "blocks")
                         updateSettings(context.source) { data ->
                             data.acquisitionDistanceVariability = blocks
                             "Initial target variability set to ${formatDecimal(blocks)} blocks."
@@ -45,6 +74,7 @@ object ZombieAiCommands {
                     }))
             .then(Commands.literal("chance_to_auto-select_closest_target")
                 .then(buildAcquisitionClosestChanceArgument()))
+            .then(abnormals)
 
         // Switching settings are separate from acquisition settings because the
         // zombie's "stay or swap" decision uses a different algorithm.
@@ -217,6 +247,43 @@ object ZombieAiCommands {
                 }
             }
 
+    private fun setAbnormalAcquisitionBehaviorChance(
+        source: CommandSource,
+        behaviorId: String,
+        percent: Double
+    ): Int {
+        val normalizedId = ZombieAiSavedData.normalizeAbnormalBehaviorId(behaviorId)
+        if (normalizedId == null) {
+            source.sendFailure(
+                StringTextComponent("Invalid abnormal acquisition behavior id: $behaviorId")
+                    .withStyle(TextFormatting.RED)
+            )
+            return 0
+        }
+
+        val registeredIds = AbnormalTargetAcquisitionRegistry.registeredBehaviorIds()
+        return updateSettings(source) { data ->
+            data.setAbnormalAcquisitionBehaviorChancePercent(normalizedId, percent)
+            val registrationNote = if (normalizedId in registeredIds) {
+                ""
+            } else {
+                " No behavior with this id is registered yet."
+            }
+            "Abnormal acquisition behavior '$normalizedId' chance set to ${formatPercent(percent)}.$registrationNote"
+        }
+    }
+
+    private fun sendAbnormalBehaviorList(source: CommandSource) {
+        val registeredIds = AbnormalTargetAcquisitionRegistry.registeredBehaviorIds()
+        val message = if (registeredIds.isEmpty()) {
+            "No abnormal acquisition behaviors are registered yet."
+        } else {
+            "Registered abnormal acquisition behaviors: ${registeredIds.joinToString(", ")}"
+        }
+
+        source.sendSuccess(StringTextComponent(message).withStyle(TextFormatting.YELLOW), false)
+    }
+
     private fun killAllZombies(source: CommandSource): Int {
         var killed = 0
         for (world in source.server.allLevels) {
@@ -290,6 +357,17 @@ object ZombieAiCommands {
             .append(value(formatPercent(data.acquisitionClosestChancePercent)))
             .append(" (i.e. the chance to GUARANTEE the closest possible target will be selected)")
             .append(StringTextComponent("\n"))
+            .append(StringTextComponent("Abnormals\n").withStyle(TextFormatting.YELLOW, TextFormatting.BOLD))
+            .append(label("Abnormal Chance"))
+            .append(value(formatPercent(data.abnormalAcquisitionChancePercent)))
+            .append(" (chance to roll an abnormal acquisition behavior)")
+            .append(StringTextComponent("\n"))
+            .append(label("Registered Behaviors"))
+            .append(value(formatBehaviorIds(AbnormalTargetAcquisitionRegistry.registeredBehaviorIds())))
+            .append(StringTextComponent("\n"))
+            .append(label("Behavior Chances"))
+            .append(value(formatBehaviorChances(data.abnormalAcquisitionBehaviorChancePercents())))
+            .append(StringTextComponent("\n"))
             .append(StringTextComponent("Switching\n").withStyle(TextFormatting.YELLOW, TextFormatting.BOLD))
             .append(label("Enabled"))
             .append(flag(data.switchEnabled, "YES", "NO"))
@@ -336,6 +414,24 @@ object ZombieAiCommands {
 
     private fun formatPercent(value: Double): String {
         return "${formatDecimal(value)}%"
+    }
+
+    private fun formatBehaviorIds(behaviorIds: List<String>): String {
+        if (behaviorIds.isEmpty()) {
+            return "none"
+        }
+
+        return behaviorIds.joinToString(", ")
+    }
+
+    private fun formatBehaviorChances(behaviorChances: Map<String, Double>): String {
+        if (behaviorChances.isEmpty()) {
+            return "none"
+        }
+
+        return behaviorChances.entries
+            .sortedBy { it.key }
+            .joinToString(", ") { (behaviorId, percent) -> "$behaviorId=${formatPercent(percent)}" }
     }
 
     private fun pluralize(count: Int): String {
