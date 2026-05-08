@@ -11,10 +11,12 @@ Instead of hardcoding one zombie behavior profile, the mod exposes runtime comma
 - Optionally prevents zombies from despawning naturally.
 - Replaces vanilla "pick the nearest valid target" behavior with configurable target acquisition.
 - Adds a framework for weighted abnormal target-acquisition behaviors.
+- Lets operators change which target families specific nearby zombies may attack.
+- Adds optional horse targeting for zombies.
 - Optionally lets zombies re-evaluate and switch targets over time using weighted rules.
 - Adds easy-to-use admin commands to kill zombies globally or within a radius.
 
-The mod keeps vanilla target families intact. A zombie can still only target the kinds of entities vanilla would normally allow, but the selection logic inside those target pools becomes configurable.
+The mod keeps vanilla target families enabled by default. Horse targeting is available as an explicit per-zombie option, so existing worlds do not suddenly make every zombie attack horses unless an operator enables it.
 
 ## Compatibility
 
@@ -30,6 +32,7 @@ The mod keeps vanilla target families intact. A zombie can still only target the
 - Command roots: `czai` and `configurablezombieai`
 - Permission level: operator level `2`
 - Settings are saved in world data, so they persist across restarts.
+- Per-zombie target-family changes are saved on the affected zombies.
 - When settings change, loaded zombies are refreshed immediately.
 
 ## Command Reference
@@ -46,6 +49,20 @@ Examples below use the short root command, but every command also works with `co
 | `czai ignore_LOS <true\|false>` | Makes zombies ignore line-of-sight checks when choosing valid targets. |
 | `czai despawn_prevention <true\|false>` | Prevents natural zombie despawning when enabled. |
 | `czai visibility_range <blocks>` | Sets the zombie follow range / detection distance. |
+
+### Target Type Commands
+
+These commands apply to loaded zombies within the given radius of the command source position.
+
+| Command | Description |
+| --- | --- |
+| `czai targets radius <blocks> players <true\|false>` | Toggles whether affected zombies may target players. |
+| `czai targets radius <blocks> villagers <true\|false>` | Toggles whether affected zombies may target villagers. |
+| `czai targets radius <blocks> iron_golems <true\|false>` | Toggles whether affected zombies may target iron golems. |
+| `czai targets radius <blocks> turtles <true\|false>` | Toggles whether affected zombies may target baby turtles on land. |
+| `czai targets radius <blocks> horses <true\|false>` | Toggles whether affected zombies may target horses. |
+| `czai targets radius <blocks> all <true\|false>` | Sets every configurable target family for affected zombies. |
+| `czai targets radius <blocks> reset` | Restores affected zombies to default target-family settings. |
 
 ### Acquisition Tuning
 
@@ -99,6 +116,7 @@ Switching is off by default. When enabled, zombies periodically re-roll their ta
 | Chance to auto-select closest target | `100.0%` |
 | Abnormal acquisition chance | `0.0%` |
 | Abnormal behavior weights | `1.0` per registered behavior |
+| Per-zombie target families | Players, villagers, iron golems, and turtles enabled; horses disabled |
 | Switching enabled | `false` |
 | Switching interval | `40` ticks |
 | Switching search radius | `16.0` blocks |
@@ -108,8 +126,9 @@ Switching is off by default. When enabled, zombies periodically re-roll their ta
 
 ## Targeting Notes
 
-- Acquisition still respects vanilla target categories such as players, villagers, iron golems, and baby turtles on land.
-- Abnormal acquisition behavior is attempted only after vanilla-compatible candidates have been collected. If no abnormal behavior is registered, no behavior has a positive configured weight, or the selected behavior cannot produce a valid target, normal acquisition runs instead.
+- Acquisition respects the per-zombie target-family settings. By default this matches vanilla categories such as players, villagers, iron golems, and baby turtles on land.
+- Horse targeting is added by this mod and starts disabled until enabled on specific zombies with `czai targets radius <blocks> horses true`.
+- Abnormal acquisition behavior is attempted only after configured-compatible candidates have been collected. If no abnormal behavior is registered, no behavior has a positive configured weight, or the selected behavior cannot produce a valid target, normal acquisition runs instead.
 - Switching does not jump between target families. If a zombie is currently chasing a villager, it will only compare that villager against other villager candidates during a switching pass.
 - Line-of-sight bypass still respects attack validity checks and the configured visibility range.
 

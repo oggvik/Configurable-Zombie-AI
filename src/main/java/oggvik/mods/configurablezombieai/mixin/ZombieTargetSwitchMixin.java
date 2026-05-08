@@ -19,6 +19,7 @@ public abstract class ZombieTargetSwitchMixin {
 
         // Injecting at the tail lets vanilla AI update first, then gives the
         // mod a chance to replace the target on configured switch ticks.
+        ZombieAiRuntime.enforceTargetSettings(zombie);
         LivingEntity selectedTarget = ZombieAiRuntime.selectSwitchTarget(zombie);
         if (selectedTarget != null && selectedTarget != zombie.getTarget()) {
             zombie.setTarget(selectedTarget);

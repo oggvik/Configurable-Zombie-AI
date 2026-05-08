@@ -8,7 +8,9 @@
     "EntitySensesMixin",
     "NearestAttackableTargetGoalMixin",
     "TargetGoalAccessor",
+    "ZombieHorseTargetGoalMixin",
     "ZombiePersistenceMixin",
+    "ZombieSetTargetMixin",
     "ZombieTargetSwitchMixin"
   ],
   "client": [],

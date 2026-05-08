@@ -8,17 +8,14 @@ import net.minecraft.entity.EntityPredicate
 import net.minecraft.entity.LivingEntity
 import net.minecraft.entity.MobEntity
 import net.minecraft.entity.ai.attributes.Attributes
-import net.minecraft.entity.merchant.villager.AbstractVillagerEntity
 import net.minecraft.entity.monster.ZombieEntity
-import net.minecraft.entity.passive.IronGolemEntity
-import net.minecraft.entity.passive.TurtleEntity
-import net.minecraft.entity.player.PlayerEntity
 import net.minecraft.server.MinecraftServer
 import oggvik.mods.configurablezombieai.ConfigurableZombieAI
 import oggvik.mods.configurablezombieai.config.ZombieAiSavedData
 import oggvik.mods.configurablezombieai.runtime.abnormals.targetacquisition.AbnormalTargetAcquisitionCandidate
 import oggvik.mods.configurablezombieai.runtime.abnormals.targetacquisition.AbnormalTargetAcquisitionContext
 import oggvik.mods.configurablezombieai.runtime.abnormals.targetacquisition.AbnormalTargetAcquisitionRegistry
+import oggvik.mods.configurablezombieai.runtime.targeting.ZombieTargetType
 import java.util.function.Predicate
 
 /**
@@ -34,6 +31,7 @@ object ZombieAiRuntime {
         "${ConfigurableZombieAI.ID}.abnormal_target_switch_lock"
     private const val ABNORMAL_TARGET_SWITCH_LOCK_TARGET_UUID_KEY: String =
         "${ConfigurableZombieAI.ID}.abnormal_target_switch_lock_target_uuid"
+    private const val TARGET_TYPE_KEY_PREFIX: String = "${ConfigurableZombieAI.ID}.target_type."
     private const val BIAS_CLAMP: Double = 20.0
     private const val EPSILON: Double = 1.0E-6
 
@@ -49,6 +47,10 @@ object ZombieAiRuntime {
         val livingEntity = entity as? LivingEntity ?: return false
         val settings = ZombieAiSavedData.get(mob.level) ?: return false
         if (!settings.modEnabled || !settings.ignoreLineOfSight) {
+            return false
+        }
+
+        if (!isTargetEntityAllowedByLocalRules(zombie, livingEntity)) {
             return false
         }
 
@@ -79,6 +81,9 @@ object ZombieAiRuntime {
         val zombie = mob as? ZombieEntity ?: return null
         val settings = ZombieAiSavedData.get(mob.level) ?: return null
         if (!settings.modEnabled) {
+            return null
+        }
+        if (!isTargetTypeAllowedByLocalRules(zombie, targetType)) {
             return null
         }
 
@@ -157,6 +162,11 @@ object ZombieAiRuntime {
             clearAbnormalTargetSwitchLock(zombie)
             return null
         }
+        if (!isTargetEntityAllowedByLocalRules(zombie, currentTarget)) {
+            clearAbnormalTargetSwitchLock(zombie)
+            zombie.setTarget(null)
+            return null
+        }
         if (isTargetSwitchingLockedByAbnormalAcquisition(zombie, currentTarget)) {
             return null
         }
@@ -167,12 +177,9 @@ object ZombieAiRuntime {
         }
 
         // Switching runs as a fresh weighted draw on the configured tick, but
-        // it is not a completely global re-acquisition. The zombie keeps the
-        // current target's family as the switching domain, so a zombie already
-        // chasing a villager will only compare villagers during this pass.
-        // Switching is deliberately family-local. Once a zombie is already
-        // chasing a player, villager, golem, or turtle, the switching pass only
-        // evaluates alternatives in that same family.
+        // it is deliberately family-local. Once a zombie is already chasing a
+        // player, villager, golem, turtle, horse, or another target type, the
+        // switching pass only evaluates alternatives in that same family.
         val targetFamily = resolveTargetFamily(currentTarget)
         val candidatesById = LinkedHashMap<Int, TargetCandidate>()
         for (candidate in collectSwitchCandidates(zombie, targetFamily, settings)) {
@@ -220,6 +227,73 @@ object ZombieAiRuntime {
     }
 
     @JvmStatic
+    fun canUseConfiguredTarget(zombie: ZombieEntity, target: LivingEntity): Boolean {
+        val settings = ZombieAiSavedData.get(zombie.level) ?: return false
+        return settings.modEnabled && isTargetEntityAllowedByLocalRules(zombie, target)
+    }
+
+    @JvmStatic
+    fun canSetConfiguredTarget(zombie: ZombieEntity, target: LivingEntity?): Boolean {
+        if (target == null) {
+            return true
+        }
+
+        val settings = ZombieAiSavedData.get(zombie.level) ?: return true
+        if (!settings.modEnabled) {
+            return true
+        }
+
+        return isTargetEntityAllowedByLocalRules(zombie, target)
+    }
+
+    @JvmStatic
+    fun enforceTargetSettings(zombie: ZombieEntity) {
+        val settings = ZombieAiSavedData.get(zombie.level) ?: return
+        if (!settings.modEnabled) {
+            return
+        }
+
+        val currentTarget = zombie.target ?: return
+        if (!currentTarget.isAlive || !isTargetEntityAllowedByLocalRules(zombie, currentTarget)) {
+            clearAbnormalTargetSwitchLock(zombie)
+            zombie.setTarget(null)
+        }
+    }
+
+    @JvmStatic
+    fun setTargetTypeEnabled(zombie: ZombieEntity, targetType: ZombieTargetType, enabled: Boolean) {
+        zombie.persistentData.putBoolean(targetTypeKey(targetType), enabled)
+        enforceTargetSettings(zombie)
+    }
+
+    @JvmStatic
+    fun setAllTargetTypesEnabled(zombie: ZombieEntity, enabled: Boolean) {
+        for (targetType in ZombieTargetType.values()) {
+            zombie.persistentData.putBoolean(targetTypeKey(targetType), enabled)
+        }
+        enforceTargetSettings(zombie)
+    }
+
+    @JvmStatic
+    fun resetTargetTypes(zombie: ZombieEntity) {
+        for (targetType in ZombieTargetType.values()) {
+            zombie.persistentData.remove(targetTypeKey(targetType))
+        }
+        enforceTargetSettings(zombie)
+    }
+
+    @JvmStatic
+    fun isTargetTypeEnabled(zombie: ZombieEntity, targetType: ZombieTargetType): Boolean {
+        val persistentData = zombie.persistentData
+        val key = targetTypeKey(targetType)
+        return if (persistentData.contains(key)) {
+            persistentData.getBoolean(key)
+        } else {
+            targetType.defaultEnabled
+        }
+    }
+
+    @JvmStatic
     fun applyCurrentSettings(zombie: ZombieEntity) {
         if (zombie.level.isClientSide) {
             return
@@ -246,15 +320,34 @@ object ZombieAiRuntime {
 
     @JvmStatic
     fun onSettingsChanged(server: MinecraftServer) {
-        // Only follow range needs an eager push. Other behaviors pick up the new
-        // values naturally because the runtime helpers re-read saved settings.
+        // Follow range is cached in entity attributes. Current targets also get
+        // checked here so disabling the mod restores vanilla range but does not
+        // leave stale disallowed targets when settings are enabled.
         for (world in server.allLevels) {
             for (entity in world.allEntities) {
                 if (entity is ZombieEntity) {
                     applyCurrentSettings(entity)
+                    enforceTargetSettings(entity)
                 }
             }
         }
+    }
+
+    private fun isTargetTypeAllowedByLocalRules(
+        zombie: ZombieEntity,
+        targetClass: Class<out LivingEntity>
+    ): Boolean {
+        val targetType = ZombieTargetType.fromTargetClass(targetClass) ?: return true
+        return isTargetTypeEnabled(zombie, targetType)
+    }
+
+    private fun isTargetEntityAllowedByLocalRules(zombie: ZombieEntity, target: LivingEntity): Boolean {
+        val targetType = ZombieTargetType.fromTarget(target) ?: return true
+        return isTargetTypeEnabled(zombie, targetType)
+    }
+
+    private fun targetTypeKey(targetType: ZombieTargetType): String {
+        return TARGET_TYPE_KEY_PREFIX + targetType.id
     }
 
     private fun isTargetSwitchingLockedByAbnormalAcquisition(
@@ -395,13 +488,13 @@ object ZombieAiRuntime {
     }
 
     private fun resolveTargetFamily(target: LivingEntity): TargetFamily {
-        // These families mirror the main zombie target-goal buckets in vanilla.
-        return when (target) {
-            is PlayerEntity -> TargetFamily(PlayerEntity::class.java)
-            is AbstractVillagerEntity -> TargetFamily(AbstractVillagerEntity::class.java)
-            is IronGolemEntity -> TargetFamily(IronGolemEntity::class.java)
-            is TurtleEntity -> TargetFamily(TurtleEntity::class.java, TurtleEntity.BABY_ON_LAND_SELECTOR)
-            else -> TargetFamily(target.javaClass.asSubclass(LivingEntity::class.java))
+        // These families mirror the zombie target-goal buckets, including the
+        // additional horse family registered by this mod.
+        val configuredType = ZombieTargetType.fromTarget(target)
+        return if (configuredType != null) {
+            TargetFamily(configuredType.targetClass, configuredType.selector)
+        } else {
+            TargetFamily(target.javaClass.asSubclass(LivingEntity::class.java))
         }
     }
 

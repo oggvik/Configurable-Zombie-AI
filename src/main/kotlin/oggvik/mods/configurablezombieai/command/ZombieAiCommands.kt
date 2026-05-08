@@ -12,12 +12,14 @@ import net.minecraft.command.Commands
 import net.minecraft.entity.monster.ZombieEntity
 import net.minecraft.entity.player.ServerPlayerEntity
 import net.minecraft.util.Util
+import net.minecraft.util.math.AxisAlignedBB
 import net.minecraft.util.text.IFormattableTextComponent
 import net.minecraft.util.text.StringTextComponent
 import net.minecraft.util.text.TextFormatting
 import oggvik.mods.configurablezombieai.config.ZombieAiSavedData
 import oggvik.mods.configurablezombieai.runtime.abnormals.targetacquisition.AbnormalTargetAcquisitionRegistry
 import oggvik.mods.configurablezombieai.runtime.ZombieAiRuntime
+import oggvik.mods.configurablezombieai.runtime.targeting.ZombieTargetType
 
 /**
  * OP-only runtime control surface for the mod.
@@ -117,6 +119,43 @@ object ZombieAiCommands {
             .then(Commands.literal("closer_than_current_target_bias")
                 .then(buildSwitchRelativeImprovementBiasArgument()))
 
+        val targetsRadius = Commands.argument("blocks", DoubleArgumentType.doubleArg(0.0, 4096.0))
+        for (targetType in ZombieTargetType.values()) {
+            targetsRadius.then(
+                Commands.literal(targetType.id)
+                    .then(Commands.argument("enabled", BoolArgumentType.bool())
+                        .executes { context ->
+                            setTargetTypeForZombiesInRadius(
+                                context.source,
+                                DoubleArgumentType.getDouble(context, "blocks"),
+                                targetType,
+                                BoolArgumentType.getBool(context, "enabled")
+                            )
+                        })
+            )
+        }
+        targetsRadius
+            .then(Commands.literal("all")
+                .then(Commands.argument("enabled", BoolArgumentType.bool())
+                    .executes { context ->
+                        setAllTargetTypesForZombiesInRadius(
+                            context.source,
+                            DoubleArgumentType.getDouble(context, "blocks"),
+                            BoolArgumentType.getBool(context, "enabled")
+                        )
+                    }))
+            .then(Commands.literal("reset")
+                .executes { context ->
+                    resetTargetTypesForZombiesInRadius(
+                        context.source,
+                        DoubleArgumentType.getDouble(context, "blocks")
+                    )
+                })
+
+        val targets = Commands.literal("targets")
+            .then(Commands.literal("radius")
+                .then(targetsRadius))
+
         // Utility commands are kept under the same root so server operators only
         // need one namespace for both AI tuning and admin actions.
         val kill = Commands.literal("kill")
@@ -182,6 +221,7 @@ object ZombieAiCommands {
                     }))
             .then(kill)
             .then(acquisition)
+            .then(targets)
             .then(switching)
     }
 
@@ -307,6 +347,76 @@ object ZombieAiCommands {
         }
 
         source.sendSuccess(StringTextComponent(message).withStyle(TextFormatting.YELLOW), false)
+    }
+
+    private fun setTargetTypeForZombiesInRadius(
+        source: CommandSource,
+        radius: Double,
+        targetType: ZombieTargetType,
+        enabled: Boolean
+    ): Int {
+        val zombies = findZombiesInRadius(source, radius)
+        for (zombie in zombies) {
+            ZombieAiRuntime.setTargetTypeEnabled(zombie, targetType, enabled)
+        }
+
+        source.sendSuccess(
+            StringTextComponent(
+                "Set ${targetType.displayName} targeting ${formatToggle(enabled)} for ${zombies.size} zombie${pluralize(zombies.size)} within ${formatDecimal(radius)} blocks of ${source.textName}."
+            ).withStyle(TextFormatting.GREEN),
+            true
+        )
+        return zombies.size
+    }
+
+    private fun setAllTargetTypesForZombiesInRadius(
+        source: CommandSource,
+        radius: Double,
+        enabled: Boolean
+    ): Int {
+        val zombies = findZombiesInRadius(source, radius)
+        for (zombie in zombies) {
+            ZombieAiRuntime.setAllTargetTypesEnabled(zombie, enabled)
+        }
+
+        source.sendSuccess(
+            StringTextComponent(
+                "Set all configurable target types ${formatToggle(enabled)} for ${zombies.size} zombie${pluralize(zombies.size)} within ${formatDecimal(radius)} blocks of ${source.textName}."
+            ).withStyle(TextFormatting.GREEN),
+            true
+        )
+        return zombies.size
+    }
+
+    private fun resetTargetTypesForZombiesInRadius(source: CommandSource, radius: Double): Int {
+        val zombies = findZombiesInRadius(source, radius)
+        for (zombie in zombies) {
+            ZombieAiRuntime.resetTargetTypes(zombie)
+        }
+
+        source.sendSuccess(
+            StringTextComponent(
+                "Reset configurable target types to defaults for ${zombies.size} zombie${pluralize(zombies.size)} within ${formatDecimal(radius)} blocks of ${source.textName}."
+            ).withStyle(TextFormatting.GREEN),
+            true
+        )
+        return zombies.size
+    }
+
+    private fun findZombiesInRadius(source: CommandSource, radius: Double): List<ZombieEntity> {
+        val origin = source.position
+        val searchBox = AxisAlignedBB(
+            origin.x - radius,
+            origin.y - radius,
+            origin.z - radius,
+            origin.x + radius,
+            origin.y + radius,
+            origin.z + radius
+        )
+        val radiusSqr = radius * radius
+        return source.level.getEntitiesOfClass(ZombieEntity::class.java, searchBox) { zombie ->
+            zombie.distanceToSqr(origin) <= radiusSqr
+        }
     }
 
     private fun killAllZombies(source: CommandSource): Int {
