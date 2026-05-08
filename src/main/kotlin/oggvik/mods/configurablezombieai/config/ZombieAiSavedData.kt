@@ -57,7 +57,7 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
             setDirty()
         }
 
-    private val abnormalAcquisitionBehaviorChancePercents: MutableMap<String, Double> = linkedMapOf()
+    private val abnormalAcquisitionBehaviorWeights: MutableMap<String, Double> = linkedMapOf()
 
     var switchEnabled: Boolean = false
         set(value) {
@@ -117,11 +117,11 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
         if (nbt.contains(ABNORMAL_ACQUISITION_CHANCE_PERCENT_KEY)) {
             abnormalAcquisitionChancePercent = nbt.getDouble(ABNORMAL_ACQUISITION_CHANCE_PERCENT_KEY)
         }
-        abnormalAcquisitionBehaviorChancePercents.clear()
-        if (nbt.contains(ABNORMAL_ACQUISITION_BEHAVIOR_CHANCES_KEY, NBT_COMPOUND_ID)) {
-            val behaviorChances = nbt.getCompound(ABNORMAL_ACQUISITION_BEHAVIOR_CHANCES_KEY)
-            for (behaviorId in behaviorChances.allKeys) {
-                setAbnormalAcquisitionBehaviorChancePercent(behaviorId, behaviorChances.getDouble(behaviorId))
+        abnormalAcquisitionBehaviorWeights.clear()
+        if (nbt.contains(ABNORMAL_ACQUISITION_BEHAVIOR_WEIGHTS_KEY, NBT_COMPOUND_ID)) {
+            val behaviorWeights = nbt.getCompound(ABNORMAL_ACQUISITION_BEHAVIOR_WEIGHTS_KEY)
+            for (behaviorId in behaviorWeights.allKeys) {
+                setAbnormalAcquisitionBehaviorWeight(behaviorId, behaviorWeights.getDouble(behaviorId))
             }
         }
         if (nbt.contains("switchEnabled")) {
@@ -152,11 +152,11 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
         compound.putDouble("acquisitionDistanceVariability", acquisitionDistanceVariability)
         compound.putDouble(ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY, acquisitionClosestChancePercent)
         compound.putDouble(ABNORMAL_ACQUISITION_CHANCE_PERCENT_KEY, abnormalAcquisitionChancePercent)
-        val behaviorChances = CompoundNBT()
-        for ((behaviorId, chancePercent) in abnormalAcquisitionBehaviorChancePercents) {
-            behaviorChances.putDouble(behaviorId, chancePercent)
+        val behaviorWeights = CompoundNBT()
+        for ((behaviorId, weight) in abnormalAcquisitionBehaviorWeights) {
+            behaviorWeights.putDouble(behaviorId, weight)
         }
-        compound.put(ABNORMAL_ACQUISITION_BEHAVIOR_CHANCES_KEY, behaviorChances)
+        compound.put(ABNORMAL_ACQUISITION_BEHAVIOR_WEIGHTS_KEY, behaviorWeights)
         compound.putBoolean("switchEnabled", switchEnabled)
         compound.putInt("switchIntervalTicks", switchIntervalTicks)
         compound.putDouble("switchSearchRadius", switchSearchRadius)
@@ -166,23 +166,18 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
         return compound
     }
 
-    fun abnormalAcquisitionBehaviorChancePercents(): Map<String, Double> {
-        return abnormalAcquisitionBehaviorChancePercents.toMap()
+    fun abnormalAcquisitionBehaviorWeights(): Map<String, Double> {
+        return abnormalAcquisitionBehaviorWeights.toMap()
     }
 
-    fun getAbnormalAcquisitionBehaviorChancePercent(behaviorId: String): Double {
+    fun getAbnormalAcquisitionBehaviorWeight(behaviorId: String): Double {
         val normalizedId = normalizeAbnormalBehaviorId(behaviorId) ?: return 0.0
-        return abnormalAcquisitionBehaviorChancePercents[normalizedId] ?: 0.0
+        return abnormalAcquisitionBehaviorWeights[normalizedId] ?: DEFAULT_ABNORMAL_ACQUISITION_BEHAVIOR_WEIGHT
     }
 
-    fun setAbnormalAcquisitionBehaviorChancePercent(behaviorId: String, percent: Double): Boolean {
+    fun setAbnormalAcquisitionBehaviorWeight(behaviorId: String, weight: Double): Boolean {
         val normalizedId = normalizeAbnormalBehaviorId(behaviorId) ?: return false
-        val clampedPercent = coercePercent(percent)
-        if (clampedPercent <= 0.0) {
-            abnormalAcquisitionBehaviorChancePercents.remove(normalizedId)
-        } else {
-            abnormalAcquisitionBehaviorChancePercents[normalizedId] = clampedPercent
-        }
+        abnormalAcquisitionBehaviorWeights[normalizedId] = coerceWeight(weight)
         setDirty()
         return true
     }
@@ -191,9 +186,10 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
         private const val DATA_NAME: String = "${ConfigurableZombieAI.ID}_settings"
         private const val ACQUISITION_CLOSEST_CHANCE_PERCENT_KEY: String = "acquisitionClosestChancePercent"
         private const val ABNORMAL_ACQUISITION_CHANCE_PERCENT_KEY: String = "abnormalAcquisitionChancePercent"
-        private const val ABNORMAL_ACQUISITION_BEHAVIOR_CHANCES_KEY: String = "abnormalAcquisitionBehaviorChancePercents"
+        private const val ABNORMAL_ACQUISITION_BEHAVIOR_WEIGHTS_KEY: String = "abnormalAcquisitionBehaviorWeights"
         private const val NBT_COMPOUND_ID: Int = 10
         const val VANILLA_FOLLOW_RANGE: Double = 35.0
+        const val DEFAULT_ABNORMAL_ACQUISITION_BEHAVIOR_WEIGHT: Double = 1.0
         private val ABNORMAL_BEHAVIOR_ID_PATTERN = Regex("[a-z0-9_.:-]+")
 
         // Commands and mixins ask for settings frequently, so the current
@@ -232,6 +228,14 @@ class ZombieAiSavedData : WorldSavedData(DATA_NAME) {
             }
 
             return value.coerceIn(0.0, 100.0)
+        }
+
+        private fun coerceWeight(value: Double): Double {
+            if (!value.isFinite()) {
+                return 0.0
+            }
+
+            return value.coerceAtLeast(0.0)
         }
 
         fun normalizeAbnormalBehaviorId(behaviorId: String): String? {

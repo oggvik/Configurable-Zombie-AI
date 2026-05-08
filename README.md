@@ -56,7 +56,8 @@ These settings affect how a zombie picks an initial target after vanilla has alr
 | `czai acquisition distance_variability_from_closest_target <blocks>` | Expands the initial candidate pool beyond the closest target by the given distance. |
 | `czai acquisition chance_to_auto-select_closest_target <percent>` | Chance to guarantee the closest available target is chosen. At `100`, the closest target always wins. At `0`, any candidate in the acquisition pool may be chosen. |
 | `czai acquisition abnormals chance <percent>` | Chance that an initial target acquisition roll tries to use an abnormal behavior before falling back to normal acquisition. |
-| `czai acquisition abnormals behavior <behavior_id> chance <percent>` | Sets the relative chance for a specific abnormal behavior id. Behaviors with `0` chance are ignored. |
+| `czai acquisition abnormals behavior <behavior_id> weight <value>` | Sets the relative weight for a specific abnormal behavior id. A weight of `1.0` is baseline, `2.0` is twice as likely as baseline, `0.5` is half as likely, and `0.0` disables that behavior. |
+| `czai acquisition abnormals reset_behavior_weights` | Resets all registered abnormal behavior weights to `1.0`. |
 | `czai acquisition abnormals list` | Lists registered abnormal acquisition behaviors. |
 
 Registered abnormal acquisition behaviors:
@@ -96,7 +97,7 @@ Switching is off by default. When enabled, zombies periodically re-roll their ta
 | Acquisition distance variability | `0.0` blocks |
 | Chance to auto-select closest target | `100.0%` |
 | Abnormal acquisition chance | `0.0%` |
-| Abnormal behavior chances | none configured |
+| Abnormal behavior weights | `1.0` per registered behavior |
 | Switching enabled | `false` |
 | Switching interval | `40` ticks |
 | Switching search radius | `16.0` blocks |
@@ -107,7 +108,7 @@ Switching is off by default. When enabled, zombies periodically re-roll their ta
 ## Targeting Notes
 
 - Acquisition still respects vanilla target categories such as players, villagers, iron golems, and baby turtles on land.
-- Abnormal acquisition behavior is attempted only after vanilla-compatible candidates have been collected. If no abnormal behavior is registered, no behavior has a positive configured chance, or the selected behavior cannot produce a valid target, normal acquisition runs instead.
+- Abnormal acquisition behavior is attempted only after vanilla-compatible candidates have been collected. If no abnormal behavior is registered, no behavior has a positive configured weight, or the selected behavior cannot produce a valid target, normal acquisition runs instead.
 - Switching does not jump between target families. If a zombie is currently chasing a villager, it will only compare that villager against other villager candidates during a switching pass.
 - Line-of-sight bypass still respects attack validity checks and the configured visibility range.
 

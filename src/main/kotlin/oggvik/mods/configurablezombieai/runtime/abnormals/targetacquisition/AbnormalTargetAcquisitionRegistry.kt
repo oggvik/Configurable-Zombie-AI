@@ -63,7 +63,7 @@ object AbnormalTargetAcquisitionRegistry {
 
         for (index in behaviorEntries.indices) {
             val behaviorId = behaviorEntries[index].key
-            val rawWeight = settings.getAbnormalAcquisitionBehaviorChancePercent(behaviorId)
+            val rawWeight = settings.getAbnormalAcquisitionBehaviorWeight(behaviorId)
             val weight = rawWeight.takeIf { it.isFinite() && it > 0.0 } ?: 0.0
             weights[index] = weight
             totalWeight += weight

@@ -45,15 +45,19 @@ object ZombieAiCommands {
                     }))
             .then(Commands.literal("behavior")
                 .then(Commands.argument("behavior_id", StringArgumentType.word())
-                    .then(Commands.literal("chance")
-                        .then(Commands.argument("percent", DoubleArgumentType.doubleArg(0.0, 100.0))
+                    .then(Commands.literal("weight")
+                        .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.0))
                             .executes { context ->
-                                setAbnormalAcquisitionBehaviorChance(
+                                setAbnormalAcquisitionBehaviorWeight(
                                     context.source,
                                     StringArgumentType.getString(context, "behavior_id"),
-                                    DoubleArgumentType.getDouble(context, "percent")
+                                    DoubleArgumentType.getDouble(context, "value")
                                 )
                             }))))
+            .then(Commands.literal("reset_behavior_weights")
+                .executes { context ->
+                    resetAbnormalAcquisitionBehaviorWeights(context.source)
+                })
             .then(Commands.literal("list")
                 .executes { context ->
                     sendAbnormalBehaviorList(context.source)
@@ -247,10 +251,10 @@ object ZombieAiCommands {
                 }
             }
 
-    private fun setAbnormalAcquisitionBehaviorChance(
+    private fun setAbnormalAcquisitionBehaviorWeight(
         source: CommandSource,
         behaviorId: String,
-        percent: Double
+        weight: Double
     ): Int {
         val normalizedId = ZombieAiSavedData.normalizeAbnormalBehaviorId(behaviorId)
         if (normalizedId == null) {
@@ -263,13 +267,34 @@ object ZombieAiCommands {
 
         val registeredIds = AbnormalTargetAcquisitionRegistry.registeredBehaviorIds()
         return updateSettings(source) { data ->
-            data.setAbnormalAcquisitionBehaviorChancePercent(normalizedId, percent)
+            data.setAbnormalAcquisitionBehaviorWeight(normalizedId, weight)
             val registrationNote = if (normalizedId in registeredIds) {
                 ""
             } else {
                 " No behavior with this id is registered yet."
             }
-            "Abnormal acquisition behavior '$normalizedId' chance set to ${formatPercent(percent)}.$registrationNote"
+            "Abnormal acquisition behavior '$normalizedId' weight set to ${formatDecimal(weight)}.$registrationNote"
+        }
+    }
+
+    private fun resetAbnormalAcquisitionBehaviorWeights(source: CommandSource): Int {
+        val registeredIds = AbnormalTargetAcquisitionRegistry.registeredBehaviorIds()
+        if (registeredIds.isEmpty()) {
+            source.sendFailure(
+                StringTextComponent("No abnormal acquisition behaviors are registered yet.")
+                    .withStyle(TextFormatting.RED)
+            )
+            return 0
+        }
+
+        return updateSettings(source) { data ->
+            for (behaviorId in registeredIds) {
+                data.setAbnormalAcquisitionBehaviorWeight(
+                    behaviorId,
+                    ZombieAiSavedData.DEFAULT_ABNORMAL_ACQUISITION_BEHAVIOR_WEIGHT
+                )
+            }
+            "Reset ${registeredIds.size} abnormal acquisition behavior weight${pluralize(registeredIds.size)} to ${formatDecimal(ZombieAiSavedData.DEFAULT_ABNORMAL_ACQUISITION_BEHAVIOR_WEIGHT)}."
         }
     }
 
@@ -365,8 +390,8 @@ object ZombieAiCommands {
             .append(label("Registered Behaviors"))
             .append(value(formatBehaviorIds(AbnormalTargetAcquisitionRegistry.registeredBehaviorIds())))
             .append(StringTextComponent("\n"))
-            .append(label("Behavior Chances"))
-            .append(value(formatBehaviorChances(data.abnormalAcquisitionBehaviorChancePercents())))
+            .append(label("Behavior Weights"))
+            .append(value(formatBehaviorWeights(data.abnormalAcquisitionBehaviorWeights())))
             .append(StringTextComponent("\n"))
             .append(StringTextComponent("Switching\n").withStyle(TextFormatting.YELLOW, TextFormatting.BOLD))
             .append(label("Enabled"))
@@ -424,14 +449,23 @@ object ZombieAiCommands {
         return behaviorIds.joinToString(", ")
     }
 
-    private fun formatBehaviorChances(behaviorChances: Map<String, Double>): String {
-        if (behaviorChances.isEmpty()) {
+    private fun formatBehaviorWeights(configuredWeights: Map<String, Double>): String {
+        val registeredIds = AbnormalTargetAcquisitionRegistry.registeredBehaviorIds()
+        if (registeredIds.isEmpty() && configuredWeights.isEmpty()) {
             return "none"
         }
 
-        return behaviorChances.entries
-            .sortedBy { it.key }
-            .joinToString(", ") { (behaviorId, percent) -> "$behaviorId=${formatPercent(percent)}" }
+        val behaviorWeights = linkedMapOf<String, Double>()
+        for (behaviorId in registeredIds) {
+            behaviorWeights[behaviorId] = configuredWeights[behaviorId]
+                ?: ZombieAiSavedData.DEFAULT_ABNORMAL_ACQUISITION_BEHAVIOR_WEIGHT
+        }
+        for ((behaviorId, weight) in configuredWeights.entries.sortedBy { it.key }) {
+            behaviorWeights.putIfAbsent(behaviorId, weight)
+        }
+
+        return behaviorWeights.entries
+            .joinToString(", ") { (behaviorId, weight) -> "$behaviorId=${formatDecimal(weight)}" }
     }
 
     private fun pluralize(count: Int): String {
