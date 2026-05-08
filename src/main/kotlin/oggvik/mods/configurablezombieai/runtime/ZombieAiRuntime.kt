@@ -87,8 +87,6 @@ object ZombieAiRuntime {
             return null
         }
 
-        clearAbnormalTargetSwitchLock(zombie)
-
         val followRange = mob.getAttributeValue(Attributes.FOLLOW_RANGE).coerceAtLeast(1.0)
         targetConditions.range(followRange)
         val candidates = collectCandidates(zombie, targetType, followRange) { candidate ->
@@ -157,7 +155,11 @@ object ZombieAiRuntime {
             return null
         }
 
-        val currentTarget = zombie.target ?: return null
+        val currentTarget = zombie.target
+        if (currentTarget == null) {
+            clearAbnormalTargetSwitchLock(zombie)
+            return null
+        }
         if (!currentTarget.isAlive) {
             clearAbnormalTargetSwitchLock(zombie)
             return null
@@ -247,13 +249,29 @@ object ZombieAiRuntime {
     }
 
     @JvmStatic
+    fun onTargetAssigned(zombie: ZombieEntity, target: LivingEntity?) {
+        if (target == null) {
+            clearAbnormalTargetSwitchLock(zombie)
+            return
+        }
+
+        if (!isTargetSwitchingLockedByAbnormalAcquisition(zombie, target)) {
+            clearAbnormalTargetSwitchLock(zombie)
+        }
+    }
+
+    @JvmStatic
     fun enforceTargetSettings(zombie: ZombieEntity) {
         val settings = ZombieAiSavedData.get(zombie.level) ?: return
         if (!settings.modEnabled) {
             return
         }
 
-        val currentTarget = zombie.target ?: return
+        val currentTarget = zombie.target
+        if (currentTarget == null) {
+            clearAbnormalTargetSwitchLock(zombie)
+            return
+        }
         if (!currentTarget.isAlive || !isTargetEntityAllowedByLocalRules(zombie, currentTarget)) {
             clearAbnormalTargetSwitchLock(zombie)
             zombie.setTarget(null)

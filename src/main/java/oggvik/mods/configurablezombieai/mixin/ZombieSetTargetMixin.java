@@ -18,4 +18,12 @@ public abstract class ZombieSetTargetMixin {
             ci.cancel();
         }
     }
+
+    @Inject(method = "setTarget(Lnet/minecraft/entity/LivingEntity;)V", at = @At("RETURN"))
+    private void configurablezombieai$afterSetTarget(LivingEntity target, CallbackInfo ci) {
+        MobEntity mob = (MobEntity) (Object) this;
+        if (mob instanceof ZombieEntity) {
+            ZombieAiRuntime.onTargetAssigned((ZombieEntity) mob, target);
+        }
+    }
 }

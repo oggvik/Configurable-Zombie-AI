@@ -15,6 +15,10 @@ All notable changes to this project will be documented in this file.
 
 - Changed abnormal behavior selection so each registered behavior defaults to weight `1.0`, with higher or lower values scaling its selection likelihood proportionally.
 
+### Fixed
+
+- Fixed `furthest_no_switching` losing its no-switch lock during later target-acquisition checks before target switching ran.
+
 ## [0.1.3] - 2026-04-26
 
 ### Changed
